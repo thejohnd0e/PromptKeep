@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "AI Prompt Image Metadata",
+  "version": "0.0.0",
+  "description": "Local-only bootstrap build for prompt-associated image metadata.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://gemini.google.com/*", "https://grok.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "permissions": ["storage", "downloads", "offscreen"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://*.googleusercontent.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "offscreen": {
+    "path": "offscreen.html",
+    "reason": "BLOBS"
+  }
+}
