@@ -1,0 +1,227 @@
+/*
+ * content-ui.css — isolated UI layer for the AI-prompt download controls.
+ * All selectors are namespaced with `aip2e-` and the layer is isolated with
+ * `isolation: isolate` so provider page styles cannot leak in or out.
+ */
+
+.aip2e-control {
+  position: absolute;
+  z-index: 2147483647;
+  isolation: isolate;
+  pointer-events: auto;
+  display: inline-block;
+  margin: 4px;
+}
+
+.aip2e-download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  background: #1f6feb;
+  color: #ffffff;
+  font:
+    500 13px / 1.4 system-ui,
+    sans-serif;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.aip2e-download-button:hover:not(:disabled) {
+  background: #1a5fd0;
+}
+
+.aip2e-download-button:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+}
+
+.aip2e-download-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aip2e-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.aip2e-dialog {
+  max-width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font:
+    14px / 1.5 system-ui,
+    sans-serif;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.aip2e-dialog:focus {
+  outline: none;
+}
+
+.aip2e-dialog-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.aip2e-dialog-thumbnail {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  margin: 0 0 12px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.aip2e-dialog-field-label {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.aip2e-dialog-prompt {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.aip2e-dialog-provider,
+.aip2e-dialog-association {
+  margin: 2px 0;
+}
+
+.aip2e-c2pa-warning {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.aip2e-c2pa-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.aip2e-c2pa-checkbox {
+  margin-top: 2px;
+}
+
+.aip2e-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.aip2e-dialog-confirm,
+.aip2e-dialog-cancel {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font:
+    500 14px / 1.4 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.aip2e-dialog-confirm {
+  border: 1px solid #1f6feb;
+  background: #1f6feb;
+  color: #ffffff;
+}
+
+.aip2e-dialog-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aip2e-dialog-cancel {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.aip2e-dialog-confirm:focus-visible,
+.aip2e-dialog-cancel:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+}
+
+.aip2e-status {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483645;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 360px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1a1a1a;
+  font:
+    13px / 1.4 system-ui,
+    sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.aip2e-status-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.aip2e-status-warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.aip2e-status-success {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.aip2e-status-code {
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.aip2e-status-message {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
