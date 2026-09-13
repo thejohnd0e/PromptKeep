@@ -80,6 +80,46 @@ declare global {
 
       function createDocument(options: CreateDocumentOptions): Promise<void>
     }
+
+    namespace downloads {
+      type DownloadConflictAction = "uniquify" | "overwrite" | "prompt"
+
+      interface DownloadOptions {
+        url: string
+        filename?: string
+        conflictAction?: DownloadConflictAction
+        saveAs?: boolean
+      }
+
+      type DownloadState = "in_progress" | "interrupted" | "complete"
+
+      interface DownloadDelta {
+        id: number
+        state?: { current?: DownloadState }
+        error?: { current?: string }
+      }
+
+      interface OnChangedEvent {
+        addListener(listener: (delta: DownloadDelta) => void): void
+        removeListener(listener: (delta: DownloadDelta) => void): void
+      }
+
+      const onChanged: OnChangedEvent
+
+      function download(options: DownloadOptions): Promise<number>
+    }
+
+    namespace storage {
+      interface StorageArea {
+        get(
+          keys?: string | string[] | Record<string, unknown> | null,
+        ): Promise<Record<string, unknown>>
+        set(items: Record<string, unknown>): Promise<void>
+        remove(keys: string | string[]): Promise<void>
+      }
+
+      const local: StorageArea
+    }
   }
 }
 
