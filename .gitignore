@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build / dist output
+dist/
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+.vite/
+
+# Tooling caches
+.playwright-mcp/
+*.tsbuildinfo
+
+# Orchestrator internal state (plans, evidence, sessions, ledger)
+.omo/
+
+# OS
+.DS_Store
+Thumbs.db
