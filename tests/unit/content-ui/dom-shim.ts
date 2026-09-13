@@ -112,6 +112,16 @@ export class MockElement {
     this.parentElement?.removeChild(this)
   }
 
+  replaceChildren(...children: MockElement[]): void {
+    for (const child of this.children) {
+      child.parentElement = null
+    }
+    this.children.length = 0
+    for (const child of children) {
+      this.appendChild(child)
+    }
+  }
+
   addEventListener(type: string, handler: (event: MockEvent) => void): void {
     const handlers = this.listeners.get(type) ?? new Set()
     handlers.add(handler)

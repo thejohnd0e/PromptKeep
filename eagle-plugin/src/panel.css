@@ -1,0 +1,63 @@
+/* AI metadata panel — scoped inspector styles. */
+
+.ai-section {
+  margin: 0 0 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+}
+
+.ai-toggle {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: #f5f5f5;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ai-toggle:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: -2px;
+}
+
+.ai-section-body {
+  padding: 4px 8px 8px;
+}
+
+.ai-field-value {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px / 1.5 monospace;
+}
+
+.ai-annotate {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 6px 8px;
+  border: 1px solid #1a73e8;
+  border-radius: 4px;
+  background: #1a73e8;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ai-annotate:focus-visible {
+  outline: 2px solid #0b47a8;
+  outline-offset: 2px;
+}
+
+.ai-status {
+  color: #1b7f3b;
+  font-size: 12px;
+}
+
+.ai-error {
+  color: #b3261e;
+  font-size: 12px;
+}
