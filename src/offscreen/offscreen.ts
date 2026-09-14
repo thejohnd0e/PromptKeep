@@ -1,4 +1,4 @@
-import { createDownloader, type DownloadOutcome } from "../chrome/download-coordinator"
+import { createAssetTransferStore } from "../shared/asset-transfer"
 import { unixMilliseconds } from "../shared/contracts"
 import {
   MESSAGE_VERSION,
@@ -6,37 +6,16 @@ import {
   type MessageRejection,
   parseInboundMessage,
 } from "../shared/messages"
-import { runPngTask } from "./png-task"
+import { revokePngBlobUrl, runPngTask } from "./png-task"
+
+const assetTransfer = createAssetTransferStore(caches)
 
 function messageRejectedResponse(reason: MessageRejection): MessageRejectedMessage {
   return { version: MESSAGE_VERSION, type: "message_rejected", reason }
 }
 
-function waitForDownloadCompletion(downloadId: number): Promise<DownloadOutcome> {
-  return new Promise((resolve) => {
-    const listener = (delta: chrome.downloads.DownloadDelta) => {
-      if (delta.id !== downloadId) return
-      if (delta.state?.current === "complete") {
-        chrome.downloads.onChanged.removeListener(listener)
-        resolve({ kind: "completed" })
-      } else if (delta.state?.current === "interrupted") {
-        chrome.downloads.onChanged.removeListener(listener)
-        const error = delta.error?.current
-        resolve(error === undefined ? { kind: "interrupted" } : { kind: "interrupted", error })
-      }
-    }
-    chrome.downloads.onChanged.addListener(listener)
-  })
-}
-
-const downloader = createDownloader({
-  createObjectUrl: (blob) => URL.createObjectURL(blob),
-  revokeObjectUrl: (url) => URL.revokeObjectURL(url),
-  download: (options) => chrome.downloads.download(options),
-  waitForDownload: waitForDownloadCompletion,
-})
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.tab !== undefined) return
   if (sender.id !== chrome.runtime.id) {
     sendResponse(messageRejectedResponse({ code: "SENDER_RUNTIME_ID_MISMATCH" }))
     return
@@ -46,23 +25,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse(messageRejectedResponse(parseResult.error))
     return
   }
-  if (parseResult.message.type !== "offscreen_job") {
-    sendResponse(messageRejectedResponse({ code: "MESSAGE_UNKNOWN_TYPE" }))
-    return
+  switch (parseResult.message.type) {
+    case "offscreen_job": {
+      const job = parseResult.message
+      void runPngTask(
+        {
+          nonce: job.nonce,
+          providerSystemLabel: job.providerSystemLabel,
+          prompt: job.prompt,
+          ...(job.sourceUrl === undefined ? {} : { sourceUrl: job.sourceUrl }),
+        },
+        { loadAsset: assetTransfer.take },
+      ).then((result) => {
+        sendResponse(result.message)
+      })
+      return true
+    }
+    case "offscreen_revoke": {
+      revokePngBlobUrl(parseResult.message.blobUrl)
+      return
+    }
+    default:
+      sendResponse(messageRejectedResponse({ code: "MESSAGE_UNKNOWN_TYPE" }))
+      return
   }
-  const job = parseResult.message
-  void runPngTask(
-    {
-      nonce: job.nonce,
-      providerSystemLabel: job.providerSystemLabel,
-      prompt: job.prompt,
-      pngBytes: job.pngBytes,
-      filenameBase: job.nonce,
-      acknowledgeCaBX: false,
-    },
-    { downloadBytes: downloader },
-  ).then((result) => {
-    sendResponse(result.message)
-  })
-  return true
 })

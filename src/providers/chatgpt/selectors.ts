@@ -5,7 +5,7 @@
  * versioned so fixtures and tests pin the exact DOM shape they cover. When a
  * selector stops matching, bump the version and refresh the fixtures.
  */
-export const CHATGPT_SELECTORS_VERSION = 1
+export const CHATGPT_SELECTORS_VERSION = 2
 
 export const CHATGPT_SELECTORS = {
   /** The message thread container holding all turns. */
@@ -20,7 +20,7 @@ export const CHATGPT_SELECTORS = {
   userTurn: "[data-message-author-role='user']",
   /** Generated image inside an assistant turn. */
   generatedImage:
-    "img[alt^='Uploaded image'], img[src*='oaiusercontent.com'], img[src*='azureedge.net']",
+    "img[src*='/backend-api/estuary/content'], [data-testid*='image'] img[src], [class*='imagegen-image'] img[src]",
   /** Provider-visible download control for a generated image. */
   downloadControl: "a[aria-label*='Download'], button[aria-label*='Download']",
   /** Composer textarea for provisional prompt capture. */

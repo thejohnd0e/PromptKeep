@@ -17,6 +17,14 @@ export type GeminiImageDescriptor = {
   readonly candidate: ImageCandidate
   readonly turnId: ProviderTurnId
   readonly proven: boolean
+  readonly element: Element
+}
+
+export type GeminiScanResult = {
+  readonly prompt: string
+  readonly turnId: ProviderTurnId
+  readonly images: readonly GeminiImageDescriptor[]
+  readonly association: "provider_identity" | "confirmation_required"
 }
 
 export type GeminiCaptureResult =
@@ -86,7 +94,7 @@ function imageDescriptor(
     container.querySelector(GEMINI_SELECTORS.downloadControl) !== null ||
     image.parentElement?.querySelector(GEMINI_SELECTORS.downloadControl) !== null
   const proven = hasDownloadControl && src !== ""
-  return { candidate, turnId, proven }
+  return { candidate, turnId, proven, element: image }
 }
 
 export function captureProvisionalPrompt(document_like: Document): PromptCapture | undefined {
@@ -189,4 +197,33 @@ export function captureGeminiTurn(
     association: classified.association,
     candidateCount: classified.candidateCount,
   }
+}
+
+/**
+ * Content-script scan: pairs every rendered user turn with the model turn
+ * that follows it and classifies the generated images found there. The
+ * prompt comes from the rendered user turn itself (deterministic turn
+ * containment); duplicate prompts stay bound to the latest match.
+ */
+export function scanGeminiTurns(
+  document_like: Document,
+  now: UnixMilliseconds,
+): readonly GeminiScanResult[] {
+  const turns = [...document_like.querySelectorAll(GEMINI_SELECTORS.turn)]
+  const results: GeminiScanResult[] = []
+  for (let index = 0; index < turns.length - 1; index += 1) {
+    const turn = turns[index]
+    if (turn === undefined || !isUserTurn(turn)) continue
+    const prompt = normalizePromptText(userTurnText(turn))
+    if (prompt === "") continue
+    const classified = classifyModelImages(document_like, index, now)
+    if (classified.images.length === 0 || classified.modelTurnId === undefined) continue
+    results.push({
+      prompt,
+      turnId: classified.modelTurnId,
+      images: classified.images,
+      association: classified.association,
+    })
+  }
+  return results
 }

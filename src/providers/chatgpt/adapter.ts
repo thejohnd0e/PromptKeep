@@ -23,7 +23,15 @@ export type ChatGptTurn = {
 export type ChatGptImageDescriptor = {
   readonly candidate: ImageCandidate
   readonly turnId: ProviderTurnId
-  readonly hasDownloadControl: boolean
+  readonly proven: boolean
+  readonly element: Element
+}
+
+export type ChatGptScanResult = {
+  readonly prompt: string
+  readonly turnId: ProviderTurnId
+  readonly images: readonly ChatGptImageDescriptor[]
+  readonly association: "provider_identity" | "confirmation_required"
 }
 
 export type ChatGptCaptureResult =
@@ -42,12 +50,15 @@ export type ChatGptCaptureResult =
 const UPLOAD_ALT_PATTERN = /^uploaded image/iu
 
 function turnKey(turn: Element, index: number): ProviderTurnId {
+  const turnId = turn.getAttribute("data-turn-id") ?? ""
   const testid = turn.getAttribute("data-testid") ?? ""
-  const stable = testid !== "" ? testid : `turn-${index}`
+  const stable = turnId !== "" ? turnId : testid !== "" ? testid : `turn-${index}`
   return providerTurnId(`chatgpt:${stable}`)
 }
 
 function roleOf(turn: Element): "user" | "assistant" | undefined {
+  const role = turn.getAttribute("data-turn") ?? turn.getAttribute("data-message-author-role")
+  if (role === "assistant" || role === "user") return role
   if (turn.querySelector(CHATGPT_SELECTORS.assistantTurn) !== null) return "assistant"
   if (turn.querySelector(CHATGPT_SELECTORS.userTurn) !== null) return "user"
   return undefined
@@ -61,10 +72,17 @@ function userTurnText(turn: Element): string {
 const GENERATED_ALT_PATTERN = /generated|created|image/iu
 
 function isGeneratedImage(image: Element): boolean {
+  if (image.getAttribute("aria-hidden") === "true") return false
   const alt = image.getAttribute("alt") ?? ""
   if (UPLOAD_ALT_PATTERN.test(alt)) return false
   const src = image.getAttribute("src") ?? ""
-  if (src.includes("oaiusercontent.com") || src.includes("azureedge.net")) return true
+  if (
+    src.includes("/backend-api/estuary/content") ||
+    src.includes("oaiusercontent.com") ||
+    src.includes("azureedge.net")
+  ) {
+    return true
+  }
   // Lazy-loaded images have no src yet; the generated-image alt text plus a
   // download control keeps them candidates pending confirmation.
   return alt !== "" && GENERATED_ALT_PATTERN.test(alt)
@@ -88,10 +106,8 @@ function imageDescriptor(
   const hasDownloadControl =
     container.querySelector(CHATGPT_SELECTORS.downloadControl) !== null ||
     image.parentElement?.querySelector(CHATGPT_SELECTORS.downloadControl) !== null
-  // A candidate is only fully proven when both a provider-visible download
-  // control and a resolvable source URL exist; lazy images stay pending.
-  const proven = hasDownloadControl && src !== ""
-  return { candidate, turnId, hasDownloadControl: proven }
+  const proven = src !== "" && (src.includes("/backend-api/estuary/content") || hasDownloadControl)
+  return { candidate, turnId, proven, element: image }
 }
 
 /**
@@ -159,7 +175,7 @@ export function classifyAssistantImages(
   const turnId = turnKey(assistant, userTurnIndex + 1)
   const images = [...assistant.querySelectorAll("img")].filter(isGeneratedImage)
   const descriptors = images.map((image, index) => imageDescriptor(image, turnId, now, index))
-  const allProven = descriptors.length > 0 && descriptors.every((d) => d.hasDownloadControl)
+  const allProven = descriptors.length > 0 && descriptors.every((d) => d.proven)
   return {
     images: descriptors,
     assistantTurnId: turnId,
@@ -209,3 +225,32 @@ export function captureChatGptTurn(
 }
 
 export type { ImageCandidateId }
+
+/**
+ * Content-script scan: pairs every rendered user turn with the assistant turn
+ * that follows it and classifies the generated images found there. The prompt
+ * comes from the rendered user turn itself (deterministic turn containment);
+ * duplicate prompts across turns stay bound to the latest match.
+ */
+export function scanChatGptTurns(
+  document_like: Document,
+  now: UnixMilliseconds,
+): readonly ChatGptScanResult[] {
+  const turns = [...document_like.querySelectorAll(CHATGPT_SELECTORS.turn)]
+  const results: ChatGptScanResult[] = []
+  for (let index = 0; index < turns.length - 1; index += 1) {
+    const turn = turns[index]
+    if (turn === undefined || roleOf(turn) !== "user") continue
+    const prompt = normalizePromptText(userTurnText(turn))
+    if (prompt === "") continue
+    const classified = classifyAssistantImages(document_like, index, now)
+    if (classified.images.length === 0 || classified.assistantTurnId === undefined) continue
+    results.push({
+      prompt,
+      turnId: classified.assistantTurnId,
+      images: classified.images,
+      association: classified.association,
+    })
+  }
+  return results
+}

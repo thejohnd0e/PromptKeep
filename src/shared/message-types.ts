@@ -64,13 +64,21 @@ export type OffscreenJobMessage = {
   readonly nonce: OperationNonce
   readonly providerSystemLabel: string
   readonly prompt: string
-  readonly pngBytes: ArrayBuffer | Blob
+  readonly sourceUrl?: string
 }
 
 export type OffscreenAckMessage = {
   readonly version: typeof MESSAGE_VERSION
   readonly type: "offscreen_ack"
   readonly nonce: OperationNonce
+  readonly blobUrl: string
+}
+
+export type OffscreenRevokeMessage = {
+  readonly version: typeof MESSAGE_VERSION
+  readonly type: "offscreen_revoke"
+  readonly nonce: OperationNonce
+  readonly blobUrl: string
 }
 
 export type StatusNotificationMessage =
@@ -101,6 +109,7 @@ export type ExtensionMessage =
   | MessageRejectedMessage
   | OffscreenJobMessage
   | OffscreenAckMessage
+  | OffscreenRevokeMessage
   | StatusNotificationMessage
 
 export type ContentResponse =

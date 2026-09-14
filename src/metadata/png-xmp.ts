@@ -36,17 +36,15 @@ function parseItxtXmp(input: Uint8Array, chunk: PngChunkDescriptor): PngResult<P
       reason: `invalid_compression_flag_${String(flag)}`,
     })
   }
-  if (flag === 1) {
-    if (pos >= dEnd)
-      return pngRejected({ code: "PNG_XMP_MALFORMED", reason: "missing_compression_method" })
-    const method = input[pos] ?? 0
-    pos += 1
-    if (method !== 0) {
-      return pngRejected({
-        code: "PNG_XMP_MALFORMED",
-        reason: `invalid_compression_method_${String(method)}`,
-      })
-    }
+  if (pos >= dEnd)
+    return pngRejected({ code: "PNG_XMP_MALFORMED", reason: "missing_compression_method" })
+  const method = input[pos] ?? 0
+  pos += 1
+  if (method !== 0) {
+    return pngRejected({
+      code: "PNG_XMP_MALFORMED",
+      reason: `invalid_compression_method_${String(method)}`,
+    })
   }
   const langEnd = findNull(input, pos, dEnd)
   if (langEnd === -1)

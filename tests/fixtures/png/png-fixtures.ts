@@ -49,7 +49,7 @@ export function makeItxt(
     keywordBytes.byteLength +
     1 +
     1 +
-    (compressed ? 1 : 0) +
+    1 +
     language.byteLength +
     1 +
     translated.byteLength +
@@ -63,10 +63,8 @@ export function makeItxt(
   pos += 1
   data[pos] = flag
   pos += 1
-  if (compressed) {
-    data[pos] = 0
-    pos += 1
-  }
+  data[pos] = 0
+  pos += 1
   data.set(language, pos)
   pos += language.byteLength
   data[pos] = 0

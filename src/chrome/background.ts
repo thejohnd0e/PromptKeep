@@ -1,3 +1,4 @@
+import { type AssetTransferStore, createAssetTransferStore } from "../shared/asset-transfer"
 import {
   type EnrichmentError,
   LIMITS,
@@ -13,6 +14,7 @@ import {
   type MessageRejection,
   OFFSCREEN_DOCUMENT_PATH,
   type OffscreenJobMessage,
+  type OffscreenRevokeMessage,
   type OperationAcceptedMessage,
   type OperationRejectedMessage,
   parseInboundMessage,
@@ -20,13 +22,15 @@ import {
 } from "../shared/messages"
 import { NonceRegistry } from "../shared/nonce-registry"
 import { PRODUCTION_ASSET_POLICY } from "./asset-policy"
-import { type AssetFetchError, type AssetFetcher, createAssetFetcher } from "./download-coordinator"
+import {
+  type AssetFetchError,
+  type AssetFetcher,
+  createAssetFetcher,
+  createDownloader,
+  type Downloader,
+  type DownloadOutcome,
+} from "./download-coordinator"
 import { JobStore, type JobStoreDeps } from "./job-store"
-
-// Wiring constants for the production asset fetcher. LIMITS in contracts.ts is
-// frozen by the task-6 boundary, so these live here.
-const ASSET_FETCH_TIMEOUT_MILLISECONDS = 30_000
-const ASSET_FETCH_RETRY_COUNT = 1
 
 class UnreachableProviderError extends Error {
   readonly name = "UnreachableProviderError"
@@ -53,8 +57,10 @@ export type BackgroundDeps = {
   readonly nonceRegistry: NonceRegistry
   readonly jobStore: JobStore
   readonly fetchAsset: AssetFetcher
+  readonly assetTransfer: AssetTransferStore
   readonly ensureOffscreenDocument: () => Promise<void>
-  readonly sendMessage: (message: OffscreenJobMessage) => Promise<unknown>
+  readonly sendMessage: (message: OffscreenJobMessage | OffscreenRevokeMessage) => Promise<unknown>
+  readonly downloadBlobUrl: Downloader
   readonly now: () => UnixMilliseconds
 }
 
@@ -82,6 +88,23 @@ function rejectedResponse(nonce: OperationNonce, error: EnrichmentError): Operat
 
 function messageRejectedResponse(reason: MessageRejection): MessageRejectedMessage {
   return { version: MESSAGE_VERSION, type: "message_rejected", reason }
+}
+
+function waitForDownloadCompletion(downloadId: number): Promise<DownloadOutcome> {
+  return new Promise((resolve) => {
+    const listener = (delta: chrome.downloads.DownloadDelta) => {
+      if (delta.id !== downloadId) return
+      if (delta.state?.current === "complete") {
+        chrome.downloads.onChanged.removeListener(listener)
+        resolve({ kind: "completed" })
+      } else if (delta.state?.current === "interrupted") {
+        chrome.downloads.onChanged.removeListener(listener)
+        const error = delta.error?.current
+        resolve(error === undefined ? { kind: "interrupted" } : { kind: "interrupted", error })
+      }
+    }
+    chrome.downloads.onChanged.addListener(listener)
+  })
 }
 
 function mapAssetError(error: AssetFetchError): EnrichmentError {
@@ -139,19 +162,27 @@ export async function handleInitiateOperation(
     if (fetched.kind === "rejected") {
       return rejectJob(deps, message.nonce, mapAssetError(fetched.error))
     }
+    await deps.assetTransfer.save(message.nonce, fetched.bytes)
     const job: OffscreenJobMessage = {
       version: MESSAGE_VERSION,
       type: "offscreen_job",
       nonce: message.nonce,
       providerSystemLabel: providerSystemLabel(message.promptCapture.provider),
       prompt: message.promptCapture.originalPrompt,
-      pngBytes: fetched.bytes.slice().buffer,
+      ...(message.promptCapture.sourceUrl === undefined
+        ? {}
+        : { sourceUrl: message.promptCapture.sourceUrl }),
     }
     const marked = await deps.jobStore.markDownloading(message.nonce)
     if (marked.kind === "rejected") {
       return rejectJob(deps, message.nonce, { code: "operation_cancelled" })
     }
-    const ack: unknown = await deps.sendMessage(job)
+    let ack: unknown
+    try {
+      ack = await deps.sendMessage(job)
+    } finally {
+      await deps.assetTransfer.delete(message.nonce)
+    }
     const parsedAck = parseInboundMessage(ack, deps.now())
     if (parsedAck.kind === "rejected") {
       return rejectJob(deps, message.nonce, { code: "operation_cancelled" })
@@ -161,6 +192,26 @@ export async function handleInitiateOperation(
     }
     if (parsedAck.message.type !== "offscreen_ack") {
       return rejectJob(deps, message.nonce, { code: "operation_cancelled" })
+    }
+    // The offscreen document can only use chrome.runtime, so it hands back a
+    // Blob URL and the service worker (which owns chrome.downloads) triggers
+    // and awaits the actual download.
+    const download = await deps.downloadBlobUrl(parsedAck.message.blobUrl, message.nonce)
+    const revoke: OffscreenRevokeMessage = {
+      version: MESSAGE_VERSION,
+      type: "offscreen_revoke",
+      nonce: message.nonce,
+      blobUrl: parsedAck.message.blobUrl,
+    }
+    await deps.sendMessage(revoke).catch(() => undefined)
+    if (download.kind === "rejected") {
+      return rejectJob(
+        deps,
+        message.nonce,
+        download.error.code === "DOWNLOAD_CANCELLED"
+          ? { code: "operation_cancelled" }
+          : { code: "download_failed" },
+      )
     }
     await deps.jobStore.complete(message.nonce)
     deps.nonceRegistry.consume(message.nonce)
@@ -188,14 +239,20 @@ if (typeof chrome !== "undefined") {
       policy: PRODUCTION_ASSET_POLICY,
       fetchImpl: (url, init) => fetch(url, init),
       maxBytes: LIMITS.maxInputBytes,
-      timeoutMilliseconds: ASSET_FETCH_TIMEOUT_MILLISECONDS,
-      retryCount: ASSET_FETCH_RETRY_COUNT,
+      timeoutMilliseconds: 30_000,
+      retryCount: 1,
     }),
+    assetTransfer: createAssetTransferStore(caches),
     ensureOffscreenDocument,
     sendMessage: (job) => chrome.runtime.sendMessage(job),
+    downloadBlobUrl: createDownloader({
+      download: (options) => chrome.downloads.download(options),
+      waitForDownload: waitForDownloadCompletion,
+    }),
     now: () => unixMilliseconds(Date.now()),
   }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.tab === undefined) return
     const senderResult = validateMessageSender(sender, chrome.runtime.id)
     if (senderResult.kind === "rejected") {
       sendResponse(messageRejectedResponse(senderResult.error))

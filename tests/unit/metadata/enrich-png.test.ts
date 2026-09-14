@@ -140,6 +140,106 @@ describe("Given enrichPng", () => {
       },
     })
   })
+
+  it("when enriching then it writes a UTF-8 iTXt parameters chunk", () => {
+    const result = enrichPng(buildValidPng(), {
+      provider: "chatgpt",
+      originalPrompt: PROMPT,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value.outputBytes)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const paramsChunk = parsed.value.chunks.find(
+      (c) => c.type === "iTXt" && result.value.outputBytes[c.dataOffset] === 0x70,
+    )
+    expect(paramsChunk).toBeDefined()
+    if (paramsChunk === undefined) return
+    const data = result.value.outputBytes.subarray(paramsChunk.dataOffset, paramsChunk.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(Buffer.from(data.subarray(0, keywordEnd)).toString("utf8")).toBe("parameters")
+    expect(Buffer.from(data.subarray(keywordEnd + 5)).toString("utf8")).toBe(PROMPT)
+  })
+
+  it("when enriching a Cyrillic prompt then the parameters chunk keeps it intact", () => {
+    const cyrillic = "Красная лиса в снегу"
+
+    const result = enrichPng(buildValidPng(), {
+      provider: "chatgpt",
+      originalPrompt: cyrillic,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value.outputBytes)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const paramsChunk = parsed.value.chunks.find(
+      (c) => c.type === "iTXt" && result.value.outputBytes[c.dataOffset] === 0x70,
+    )
+    expect(paramsChunk).toBeDefined()
+    if (paramsChunk === undefined) return
+    const data = result.value.outputBytes.subarray(paramsChunk.dataOffset, paramsChunk.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(Buffer.from(data.subarray(keywordEnd + 5)).toString("utf8")).toBe(cyrillic)
+  })
+
+  it("when enriching with a source URL then the Source tEXt chunk carries it", () => {
+    const url = "https://chatgpt.com/g/g-p-abc/c/def-123"
+
+    const result = enrichPng(buildValidPng(), {
+      provider: "chatgpt",
+      originalPrompt: PROMPT,
+      sourceUrl: url,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value.outputBytes)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const textChunks = parsed.value.chunks.filter((chunk) => chunk.type === "tEXt")
+    const texts = textChunks.map((chunk) => {
+      const data = result.value.outputBytes.subarray(chunk.dataOffset, chunk.crcOffset)
+      const keywordEnd = data.indexOf(0)
+      return {
+        keyword: Buffer.from(data.subarray(0, keywordEnd)).toString("utf8"),
+        text: Buffer.from(data.subarray(keywordEnd + 1)).toString("utf8"),
+      }
+    })
+    const source = texts.find((entry) => entry.keyword === "Source")
+    expect(source?.text).toBe(url)
+    expect(texts.some((entry) => entry.keyword === "parameters")).toBe(false)
+  })
+
+  it("when enriching then it writes a pre-IDAT Exif profile with ASCII and Unicode prompt data", () => {
+    const unicodePrompt = "Красная лиса in the snow"
+
+    const result = enrichPng(buildValidPng(), {
+      provider: "chatgpt",
+      originalPrompt: unicodePrompt,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value.outputBytes)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const exif = parsed.value.chunks.find((chunk) => chunk.type === "eXIf")
+    const firstIdat = parsed.value.chunks.find((chunk) => chunk.type === "IDAT")
+    expect(exif).toBeDefined()
+    expect(firstIdat).toBeDefined()
+    if (exif === undefined || firstIdat === undefined) return
+    expect(exif.index).toBeLessThan(firstIdat.index)
+    const profile = result.value.outputBytes.subarray(exif.dataOffset, exif.crcOffset)
+    expect(profile.slice(0, 8)).toEqual(
+      new Uint8Array([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00]),
+    )
+    expect(Buffer.from(profile).includes(Buffer.from("ChatGPT\0", "ascii"))).toBe(true)
+    expect(Buffer.from(profile).includes(Buffer.from(unicodePrompt, "utf16le"))).toBe(true)
+  })
 })
 
 describe("Given error classes", () => {

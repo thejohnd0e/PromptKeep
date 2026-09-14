@@ -47,7 +47,6 @@ function validOffscreenJob(): OffscreenJobMessage {
     nonce: operationNonce("nonce-0000000000000001"),
     providerSystemLabel: "ChatGPT",
     prompt: "a cute corgi",
-    pngBytes: new ArrayBuffer(0),
   }
 }
 
@@ -60,12 +59,98 @@ describe("message schema validation", () => {
     }
   })
 
-  it("accepts a valid offscreen job message with a Blob payload", () => {
-    const job = { ...validOffscreenJob(), pngBytes: new Blob([new Uint8Array([1, 2, 3])]) }
+  it("accepts an initiate message carrying an https source URL", () => {
+    const message = validInitiateMessage()
+    const withUrl = {
+      ...message,
+      promptCapture: {
+        ...message.promptCapture,
+        sourceUrl: "https://chatgpt.com/g/g-p-abc/c/def-123",
+      },
+    }
+
+    const result = parseInboundMessage(withUrl, NOW)
+
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok" && result.message.type === "initiate_operation") {
+      expect(result.message.promptCapture.sourceUrl).toBe("https://chatgpt.com/g/g-p-abc/c/def-123")
+    }
+  })
+
+  it("rejects an initiate message with a non-https source URL", () => {
+    const message = validInitiateMessage()
+    const withUrl = {
+      ...message,
+      promptCapture: { ...message.promptCapture, sourceUrl: "http://evil.example/x" },
+    }
+
+    const result = parseInboundMessage(withUrl, NOW)
+
+    expect(result.kind).toBe("rejected")
+    if (result.kind === "rejected") {
+      expect(result.error.code).toBe("MESSAGE_SCHEMA_MISMATCH")
+    }
+  })
+
+  it("accepts an offscreen job carrying a source URL", () => {
+    const job = {
+      ...validOffscreenJob(),
+      sourceUrl: "https://chatgpt.com/c/abc",
+    }
+
     const result = parseInboundMessage(job, NOW)
+
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok" && result.message.type === "offscreen_job") {
+      expect(result.message.sourceUrl).toBe("https://chatgpt.com/c/abc")
+    }
+  })
+
+  it("rejects an offscreen job with a binary runtime payload", () => {
+    const job = { ...validOffscreenJob(), sourceUrl: undefined, pngBytes: new ArrayBuffer(0) }
+    const result = parseInboundMessage(job, NOW)
+    expect(result.kind).toBe("rejected")
+    if (result.kind === "rejected") {
+      expect(result.error.code).toBe("MESSAGE_SCHEMA_MISMATCH")
+    }
+  })
+
+  it("accepts a JSON-safe offscreen job with the asset URL", () => {
+    // Given: the exact shape that survives Chrome runtime JSON serialization.
+    const job = {
+      version: MESSAGE_VERSION,
+      type: "offscreen_job",
+      nonce: operationNonce("nonce-0000000000000001"),
+      providerSystemLabel: "ChatGPT",
+      prompt: "a cute corgi",
+    }
+
+    // When: the offscreen boundary parses the transported message.
+    const result = parseInboundMessage(job, NOW)
+
+    // Then: the URL-based job is accepted without binary runtime payloads.
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok" && result.message.type === "offscreen_job") {
+      expect("pngBytes" in result.message).toBe(false)
+    }
+  })
+
+  it("accepts an offscreen Blob URL revocation message", () => {
+    // Given: a JSON-safe cleanup message returned after download completion.
+    const revoke = {
+      version: MESSAGE_VERSION,
+      type: "offscreen_revoke",
+      nonce: operationNonce("nonce-0000000000000001"),
+      blobUrl: "blob:chrome-extension://test/enriched-png",
+    }
+
+    // When: the offscreen boundary parses the cleanup message.
+    const result = parseInboundMessage(revoke, NOW)
+
+    // Then: cleanup reaches the offscreen listener instead of being rejected.
     expect(result.kind).toBe("ok")
     if (result.kind === "ok") {
-      expect(result.message.type).toBe("offscreen_job")
+      expect(result.message.type).toBe("offscreen_revoke")
     }
   })
 

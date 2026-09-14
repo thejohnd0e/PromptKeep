@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { parsePng } from "../../../src/metadata/png-parser"
-import { insertXmpItxt } from "../../../src/metadata/png-writer"
+import {
+  buildParametersText,
+  insertPngMetadata,
+  insertXmpItxt,
+} from "../../../src/metadata/png-writer"
 import { LIMITS } from "../../../src/shared/contracts"
 import {
   buildPng,
@@ -40,6 +44,51 @@ describe("Given insertXmpItxt", () => {
     expect(parsed.value.xmpChunkIndex).toBe(2)
   })
 
+  it("when inserting uncompressed XMP then the iTXt control fields follow the PNG specification", () => {
+    const result = insertXmpItxt(buildValidPng(), XMP)
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const chunk = parsed.value.chunks.find((candidate) => candidate.type === "iTXt")
+    expect(chunk).toBeDefined()
+    if (chunk === undefined) return
+    const data = result.value.subarray(chunk.dataOffset, chunk.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(data.slice(keywordEnd, keywordEnd + 5)).toEqual(new Uint8Array(5))
+    expect(data.slice(keywordEnd + 5)).toEqual(XMP)
+  })
+
+  it("when parametersText contains Cyrillic then an iTXt copy preserves it in UTF-8", () => {
+    const prompt = "Красная лиса в снегу"
+    const result = insertPngMetadata(buildValidPng(), {
+      xmpData: XMP,
+      parametersText: prompt,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const itxt = parsed.value.chunks.find(
+      (candidate) => candidate.type === "iTXt" && result.value[candidate.dataOffset] === 0x70,
+    )
+    expect(itxt).toBeDefined()
+    if (itxt === undefined) return
+    const data = result.value.subarray(itxt.dataOffset, itxt.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(Buffer.from(data.subarray(0, keywordEnd)).toString("utf8")).toBe("parameters")
+    expect(data.slice(keywordEnd, keywordEnd + 5)).toEqual(new Uint8Array(5))
+    expect(Buffer.from(data.subarray(keywordEnd + 5)).toString("utf8")).toBe(prompt)
+  })
+
+  it("when building parameters text then it contains only the prompt", () => {
+    expect(buildParametersText("a cat sitting on a table")).toBe("a cat sitting on a table")
+  })
+
   it("when inserting then all non-XMP chunks are copied byte-for-byte with their original CRCs", () => {
     const ancillary = makeChunk("caBX", new TextEncoder().encode("payload"))
     const input = buildValidPng({ ancillary: [ancillary] })
@@ -59,6 +108,18 @@ describe("Given insertXmpItxt", () => {
       inputCaBxOffset + 4,
     )
     expect(caBxChunk).toEqual(inputCaBxChunk)
+  })
+
+  it("when inserting metadata beside caBX then it omits eXIf to avoid ExifTool directory collisions", () => {
+    const input = buildValidPng({
+      ancillary: [makeChunk("caBX", new TextEncoder().encode("c2pa"))],
+    })
+
+    const result = insertPngMetadata(input, { xmpData: XMP, exifData: new Uint8Array([1]) })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    expect(chunkTypes(result.value)).toEqual(["IHDR", "caBX", "iTXt", "IDAT", "IEND"])
   })
 
   it("when inserting then the output re-parses as a valid PNG", () => {
@@ -154,7 +215,7 @@ describe("Given insertXmpItxt", () => {
       kind: "rejected",
       error: {
         code: "PNG_OUTPUT_TOO_LARGE",
-        actualBytes: LIMITS.maxOutputBytes + 2,
+        actualBytes: LIMITS.maxOutputBytes + 3,
         limitBytes: LIMITS.maxOutputBytes,
       },
     })
@@ -176,5 +237,110 @@ describe("Given insertXmpItxt", () => {
     const result = insertXmpItxt(input, XMP)
 
     expect(result).toEqual({ kind: "rejected", error: { code: "PNG_INVALID_SIGNATURE" } })
+  })
+
+  it("when inserting with parametersText then it writes an iTXt parameters chunk before IDAT", () => {
+    const params = buildParametersText("a cat sitting on a table")
+    const result = insertPngMetadata(buildValidPng(), {
+      xmpData: XMP,
+      parametersText: params,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const paramsChunk = parsed.value.chunks.find(
+      (c) => c.type === "iTXt" && result.value[c.dataOffset] === 0x70,
+    )
+    expect(paramsChunk).toBeDefined()
+    if (paramsChunk === undefined) return
+    const data = result.value.subarray(paramsChunk.dataOffset, paramsChunk.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(Buffer.from(data.subarray(0, keywordEnd)).toString("utf8")).toBe("parameters")
+    expect(data.slice(keywordEnd, keywordEnd + 5)).toEqual(new Uint8Array(5))
+    expect(Buffer.from(data.subarray(keywordEnd + 5)).toString("utf8")).toBe(
+      "a cat sitting on a table",
+    )
+    const firstIdat = parsed.value.chunks.find((c) => c.type === "IDAT")
+    expect(firstIdat).toBeDefined()
+    if (firstIdat !== undefined) expect(paramsChunk.index).toBeLessThan(firstIdat.index)
+  })
+
+  it("when parametersText is written then no tEXt parameters copy is emitted", () => {
+    const result = insertPngMetadata(buildValidPng(), {
+      xmpData: XMP,
+      parametersText: buildParametersText("Красная лиса в снегу"),
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const textCopies = parsed.value.chunks.filter(
+      (candidate) =>
+        candidate.type === "tEXt" &&
+        result.value[candidate.dataOffset] === 0x70 &&
+        result.value[candidate.dataOffset + 1] === 0x61,
+    )
+    expect(textCopies).toHaveLength(0)
+  })
+
+  it("when sourceUrl is provided then it writes a Source tEXt chunk before IDAT", () => {
+    const url = "https://chatgpt.com/g/g-p-abc/c/def-123"
+    const result = insertPngMetadata(buildValidPng(), { xmpData: XMP, sourceUrl: url })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const sourceChunk = parsed.value.chunks.find((c) => c.type === "tEXt")
+    expect(sourceChunk).toBeDefined()
+    if (sourceChunk === undefined) return
+    const data = result.value.subarray(sourceChunk.dataOffset, sourceChunk.crcOffset)
+    const keywordEnd = data.indexOf(0)
+    expect(Buffer.from(data.subarray(0, keywordEnd)).toString("utf8")).toBe("Source")
+    expect(Buffer.from(data.subarray(keywordEnd + 1)).toString("utf8")).toBe(url)
+    const firstIdat = parsed.value.chunks.find((c) => c.type === "IDAT")
+    expect(firstIdat).toBeDefined()
+    if (firstIdat !== undefined) expect(sourceChunk.index).toBeLessThan(firstIdat.index)
+  })
+
+  it("when sourceUrl is absent then no Source chunk is written", () => {
+    const result = insertPngMetadata(buildValidPng(), { xmpData: XMP })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const hasSource = parsed.value.chunks.some(
+      (c) =>
+        c.type === "tEXt" &&
+        result.value[c.dataOffset] === 0x53 &&
+        result.value[c.dataOffset + 1] === 0x6f,
+    )
+    expect(hasSource).toBe(false)
+  })
+
+  it("when parametersText is absent then no parameters chunk is written", () => {
+    const result = insertPngMetadata(buildValidPng(), { xmpData: XMP })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    const parsed = parsePng(result.value)
+    expect(parsed.kind).toBe("ok")
+    if (parsed.kind !== "ok") return
+    const hasParams = parsed.value.chunks.some(
+      (c) =>
+        (c.type === "tEXt" || c.type === "iTXt") &&
+        result.value[c.dataOffset] === 0x70 &&
+        result.value[c.dataOffset + 1] === 0x61 &&
+        result.value[c.dataOffset + 2] === 0x72,
+    )
+    expect(hasParams).toBe(false)
   })
 })

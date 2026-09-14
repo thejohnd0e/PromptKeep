@@ -1,10 +1,5 @@
 import type { Provider } from "../shared/contracts"
-import {
-  type AssociationType,
-  type ConfirmationDialogConfig,
-  type ConfirmationDialogHandle,
-  mountConfirmationDialog,
-} from "./confirmation-dialog"
+import type { AssociationType } from "./confirmation-dialog"
 
 export type DownloadRequest = {
   readonly prompt: string
@@ -20,9 +15,7 @@ export type DownloadControlConfig = {
   readonly provider: Provider
   readonly prompt: string
   readonly associationType: AssociationType
-  readonly hasC2PA?: boolean
   readonly onRequest: (request: DownloadRequest) => void
-  readonly onCancel?: () => void
 }
 
 export type DownloadControlHandle = {
@@ -33,65 +26,120 @@ export type DownloadControlHandle = {
 
 const mountedControls = new WeakMap<HTMLElement, DownloadControlHandle>()
 
+const SPIN_DURATION_MILLISECONDS = 600
+
+/** One full clockwise rotation as click feedback; safe to replay mid-spin. */
+function spinButton(button: HTMLButtonElement): void {
+  button.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], {
+    duration: SPIN_DURATION_MILLISECONDS,
+    easing: "ease-in-out",
+  })
+}
+
 export function mountDownloadControl(config: DownloadControlConfig): DownloadControlHandle {
   const existing = mountedControls.get(config.imageElement)
   if (existing !== undefined) {
     return existing
   }
 
+  // The control is an overlay pinned inside the image card. The card is the
+  // image's parent; when the host page has not positioned it, make it the
+  // positioning context so the overlay stays within the image bounds instead
+  // of anchoring to the viewport.
+  if (config.imageElement.offsetParent !== config.container) {
+    config.container.style.position = "relative"
+  }
+
   const control = document.createElement("div")
   control.className = "aip2e-control"
+  control.style.position = "absolute"
+  control.style.zIndex = "2147483647"
+  control.style.top = "8px"
+  control.style.right = "8px"
+  control.style.opacity = "0"
+  control.style.pointerEvents = "none"
+  control.style.transition = "opacity 120ms ease"
 
   const button = document.createElement("button")
   button.type = "button"
   button.className = "aip2e-download-button"
-  button.textContent = config.label
+  button.textContent = "A"
   button.setAttribute("aria-label", config.label)
+  button.title = config.label
   button.tabIndex = 0
+  button.style.display = "inline-flex"
+  button.style.alignItems = "center"
+  button.style.justifyContent = "center"
+  button.style.width = "28px"
+  button.style.height = "28px"
+  button.style.padding = "0"
+  button.style.fontSize = "14px"
+  button.style.fontWeight = "700"
+  button.style.lineHeight = "1"
+  button.style.fontFamily = "inherit"
+  button.style.color = "#000000"
+  button.style.backgroundColor = "#ffffff"
+  button.style.border = "1px solid rgba(0, 0, 0, 0.15)"
+  button.style.borderRadius = "50%"
+  button.style.cursor = "pointer"
+  button.style.whiteSpace = "nowrap"
 
   let prompt = config.prompt
   let ready = true
-  let dialogHandle: ConfirmationDialogHandle | null = null
 
-  const openDialog = (): void => {
-    if (!ready || dialogHandle !== null) {
+  const requestDownload = (): void => {
+    if (!ready) {
       return
     }
-    button.focus()
-    const imageSrc = (config.imageElement as HTMLImageElement).src
-    const dialogConfig: ConfirmationDialogConfig = {
-      container: document.body,
+    config.onRequest({
       prompt,
       provider: config.provider,
       associationType: config.associationType,
-      hasC2PA: config.hasC2PA ?? false,
-      ...(imageSrc === "" ? {} : { thumbnailUrl: imageSrc }),
-      onConfirm: (acknowledgeC2PA) => {
-        dialogHandle = null
-        config.onRequest({
-          prompt,
-          provider: config.provider,
-          associationType: config.associationType,
-          acknowledgeC2PA,
-        })
-      },
-      onCancel: () => {
-        dialogHandle = null
-        config.onCancel?.()
-      },
-    }
-    dialogHandle = mountConfirmationDialog(dialogConfig)
+      acknowledgeC2PA: true,
+    })
+  }
+
+  const consumeInteraction = (event: Event): void => {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const activate = (): void => {
+    spinButton(button)
+    requestDownload()
+  }
+
+  const handleClick = (event: MouseEvent): void => {
+    consumeInteraction(event)
+    activate()
   }
 
   const handleKeydown = (event: KeyboardEvent): void => {
     if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault?.()
-      openDialog()
+      consumeInteraction(event)
+      activate()
     }
   }
 
-  button.addEventListener("click", openDialog)
+  const showControl = (): void => {
+    control.style.opacity = "1"
+    control.style.pointerEvents = "auto"
+  }
+
+  const hideControl = (): void => {
+    control.style.opacity = "0"
+    control.style.pointerEvents = "none"
+  }
+
+  button.addEventListener("pointerdown", consumeInteraction)
+  button.addEventListener("mousedown", consumeInteraction)
+  button.addEventListener("click", handleClick)
   button.addEventListener("keydown", handleKeydown)
+  button.addEventListener("focus", showControl)
+  button.addEventListener("blur", hideControl)
+
+  config.container.addEventListener("mouseenter", showControl)
+  config.container.addEventListener("mouseleave", hideControl)
 
   control.appendChild(button)
   config.container.appendChild(control)
@@ -99,10 +147,14 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   const handle: DownloadControlHandle = {
     dispose: () => {
       mountedControls.delete(config.imageElement)
-      dialogHandle?.dispose()
-      dialogHandle = null
-      button.removeEventListener("click", openDialog)
+      button.removeEventListener("pointerdown", consumeInteraction)
+      button.removeEventListener("mousedown", consumeInteraction)
+      button.removeEventListener("click", handleClick)
       button.removeEventListener("keydown", handleKeydown)
+      button.removeEventListener("focus", showControl)
+      button.removeEventListener("blur", hideControl)
+      config.container.removeEventListener("mouseenter", showControl)
+      config.container.removeEventListener("mouseleave", hideControl)
       control.remove()
     },
     setPrompt: (nextPrompt) => {

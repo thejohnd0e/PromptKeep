@@ -1,6 +1,6 @@
 {
   "id": "ai-prompt-image-metadata-inspector",
-  "version": "0.0.0",
+  "version": "1.12",
   "name": "AI Prompt Image Metadata Inspector",
   "type": "inspector",
   "main": "main.js",

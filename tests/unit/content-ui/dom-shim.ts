@@ -15,6 +15,19 @@ export type MockEvent = {
   readonly stopPropagation?: () => void
 }
 
+export type MockAnimation = {
+  readonly keyframes: unknown
+  readonly options: unknown
+}
+
+const animationLog = new WeakMap<object, MockAnimation[]>()
+
+/** Reads the animations a shim element was asked to play, without casting. */
+export function animationsOf(element: object | null | undefined): readonly MockAnimation[] {
+  if (element === null || element === undefined) return []
+  return animationLog.get(element) ?? []
+}
+
 export class MockElement {
   readonly tagName: string
   readonly children: MockElement[] = []
@@ -145,6 +158,12 @@ export class MockElement {
 
   focus(): void {
     ;(document as unknown as MockDocument).activeElement = this
+  }
+
+  animate(keyframes: unknown, options?: unknown): void {
+    const existing = animationLog.get(this) ?? []
+    existing.push({ keyframes, options })
+    animationLog.set(this, existing)
   }
 
   getBoundingClientRect(): {

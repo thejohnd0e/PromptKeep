@@ -18,6 +18,14 @@ export type GrokImageDescriptor = {
   readonly turnId: ProviderTurnId
   readonly proven: boolean
   readonly expired: boolean
+  readonly element: Element
+}
+
+export type GrokScanResult = {
+  readonly prompt: string
+  readonly turnId: ProviderTurnId
+  readonly images: readonly GrokImageDescriptor[]
+  readonly association: "provider_identity" | "confirmation_required"
 }
 
 export type GrokCaptureResult =
@@ -103,7 +111,7 @@ function imageDescriptor(
   // keep the candidate alive but never prove full-size retrievability.
   const stableSrc = src !== "" && !src.startsWith("blob:")
   const proven = hasDownloadControl && stableSrc
-  return { candidate, turnId, proven, expired: cardState(image) === "expired" }
+  return { candidate, turnId, proven, expired: cardState(image) === "expired", element: image }
 }
 
 export function captureProvisionalPrompt(document_like: Document): PromptCapture | undefined {
@@ -213,4 +221,34 @@ export function captureGrokTurn(
     association: classified.association,
     candidateCount: classified.candidateCount,
   }
+}
+
+/**
+ * Content-script scan: pairs every rendered user message with the assistant
+ * message that follows it and classifies the generated image cards found
+ * there. The prompt comes from the rendered user message itself
+ * (deterministic turn containment); duplicate prompts stay bound to the
+ * latest match.
+ */
+export function scanGrokTurns(
+  document_like: Document,
+  now: UnixMilliseconds,
+): readonly GrokScanResult[] {
+  const messages = [...document_like.querySelectorAll(GROK_SELECTORS.message)]
+  const results: GrokScanResult[] = []
+  for (let index = 0; index < messages.length - 1; index += 1) {
+    const message = messages[index]
+    if (message === undefined || !isUserMessage(message)) continue
+    const prompt = normalizePromptText(userMessageText(message))
+    if (prompt === "") continue
+    const classified = classifyAssistantImages(document_like, index, now)
+    if (classified.images.length === 0 || classified.assistantTurnId === undefined) continue
+    results.push({
+      prompt,
+      turnId: classified.assistantTurnId,
+      images: classified.images,
+      association: classified.association,
+    })
+  }
+  return results
 }

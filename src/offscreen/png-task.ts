@@ -1,4 +1,3 @@
-import type { DownloadError, Downloader } from "../chrome/download-coordinator"
 import { type EnrichPngError, enrichPng } from "../metadata/enrich-png"
 import type { EnrichmentError, OperationNonce, Provider } from "../shared/contracts"
 import {
@@ -11,9 +10,7 @@ export type PngTaskRequest = {
   readonly nonce: OperationNonce
   readonly providerSystemLabel: string
   readonly prompt: string
-  readonly pngBytes: ArrayBuffer | Blob
-  readonly filenameBase: string
-  readonly acknowledgeCaBX: boolean
+  readonly sourceUrl?: string
 }
 
 export type PngTaskResult =
@@ -21,7 +18,7 @@ export type PngTaskResult =
   | { readonly kind: "rejected"; readonly message: OperationRejectedMessage }
 
 export type PngTaskDeps = {
-  readonly downloadBytes: Downloader
+  readonly loadAsset: (nonce: OperationNonce) => Promise<Uint8Array | undefined>
 }
 
 const PROVIDER_BY_SYSTEM_LABEL: Readonly<Record<string, Provider>> = {
@@ -48,20 +45,13 @@ function mapEnrichError(error: EnrichPngError): EnrichmentError {
   }
 }
 
-function mapDownloadError(error: DownloadError): EnrichmentError {
-  switch (error.code) {
-    case "DOWNLOAD_CANCELLED":
-      return { code: "operation_cancelled" }
-    case "DOWNLOAD_FAILED":
-      return { code: "download_failed" }
-  }
-}
-
-async function toUint8Array(bytes: ArrayBuffer | Blob): Promise<Uint8Array> {
-  if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes)
-  return new Uint8Array(await bytes.arrayBuffer())
-}
-
+/**
+ * Enriches the PNG bytes and exposes the result as a Blob URL. The offscreen
+ * document is the only extension context with both DOM access (for Blob URL
+ * creation) and the enrichment pipeline; the actual chrome.downloads call
+ * happens in the service worker because offscreen documents can only use the
+ * chrome.runtime API.
+ */
 export async function runPngTask(
   request: PngTaskRequest,
   deps: PngTaskDeps,
@@ -73,21 +63,33 @@ export async function runPngTask(
       provider: request.providerSystemLabel,
     })
   }
-  const input = await toUint8Array(request.pngBytes)
+  const input = await deps.loadAsset(request.nonce)
+  if (input === undefined) return rejected(request.nonce, { code: "operation_cancelled" })
   const enriched = enrichPng(
     input,
-    { provider, originalPrompt: request.prompt },
-    { acknowledgeCaBX: request.acknowledgeCaBX },
+    {
+      provider,
+      originalPrompt: request.prompt,
+      ...(request.sourceUrl === undefined ? {} : { sourceUrl: request.sourceUrl }),
+    },
+    { acknowledgeCaBX: true },
   )
   if (enriched.kind === "rejected") {
     return rejected(request.nonce, mapEnrichError(enriched.error))
   }
-  const download = await deps.downloadBytes(enriched.value.outputBytes, request.filenameBase)
-  if (download.kind === "rejected") {
-    return rejected(request.nonce, mapDownloadError(download.error))
-  }
+  const blob = new Blob([enriched.value.outputBytes.slice()], { type: "image/png" })
   return {
     kind: "ok",
-    message: { version: MESSAGE_VERSION, type: "offscreen_ack", nonce: request.nonce },
+    message: {
+      version: MESSAGE_VERSION,
+      type: "offscreen_ack",
+      nonce: request.nonce,
+      blobUrl: URL.createObjectURL(blob),
+    },
   }
+}
+
+/** Releases the Blob URL once the service worker finished the download. */
+export function revokePngBlobUrl(blobUrl: string): void {
+  URL.revokeObjectURL(blobUrl)
 }

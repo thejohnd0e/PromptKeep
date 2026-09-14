@@ -1,7 +1,9 @@
+import { adapterFor, startController } from "../content/controller"
 import {
   type ImageCandidate,
   type OperationNonce,
   type PromptCapture,
+  type Provider,
   unixMilliseconds,
 } from "../shared/contracts"
 import {
@@ -76,3 +78,27 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
       break
   }
 })
+
+function providerForHost(hostname: string): Provider | undefined {
+  if (hostname === "chatgpt.com" || hostname.endsWith(".chatgpt.com")) return "chatgpt"
+  if (hostname === "gemini.google.com" || hostname.endsWith(".gemini.google.com")) return "gemini"
+  if (hostname === "grok.com" || hostname.endsWith(".grok.com")) return "grok"
+  return undefined
+}
+
+// Provider controller wiring: scan the provider DOM, mount download controls,
+// and send initiate_operation on confirmed downloads. Guarded so the module
+// stays importable in non-extension test environments.
+if (typeof chrome !== "undefined" && chrome.runtime?.id !== undefined) {
+  const provider = providerForHost(location.hostname)
+  if (provider !== undefined) {
+    startController({
+      document_like: document,
+      provider,
+      scan: adapterFor(provider),
+      sendInitiate: sendInitiateOperation,
+      now: () => unixMilliseconds(Date.now()),
+      pageUrl: () => location.href,
+    })
+  }
+}

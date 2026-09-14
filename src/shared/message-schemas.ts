@@ -22,6 +22,11 @@ const providerSchema = z.enum(PROVIDERS)
 const nonceSchema = z.string().regex(NONCE_PATTERN).transform(operationNonce)
 const byteCountSchema = z.number().int().safe().nonnegative()
 
+const sourceUrlSchema = z
+  .string()
+  .max(2048)
+  .refine((value) => value.startsWith("https://"), { message: "sourceUrl must be https" })
+
 const promptCaptureSchema = z
   .strictObject({
     id: stringId.transform(promptCaptureId),
@@ -29,22 +34,21 @@ const promptCaptureSchema = z
     originalPrompt: z.string(),
     capturedAt: timestampSchema,
     providerTurnId: stringId.transform(providerTurnId).exactOptional(),
+    sourceUrl: sourceUrlSchema.exactOptional(),
   })
   .refine(
     (value) =>
       new TextEncoder().encode(value.originalPrompt).byteLength <= LIMITS.maxPromptUtf8Bytes,
     { message: "prompt exceeds maxPromptUtf8Bytes" },
   )
-  .transform((value) =>
-    value.providerTurnId === undefined
-      ? {
-          id: value.id,
-          provider: value.provider,
-          originalPrompt: value.originalPrompt,
-          capturedAt: value.capturedAt,
-        }
-      : value,
-  )
+  .transform((value) => ({
+    id: value.id,
+    provider: value.provider,
+    originalPrompt: value.originalPrompt,
+    capturedAt: value.capturedAt,
+    ...(value.providerTurnId === undefined ? {} : { providerTurnId: value.providerTurnId }),
+    ...(value.sourceUrl === undefined ? {} : { sourceUrl: value.sourceUrl }),
+  }))
 
 function isForbiddenUrlHost(hostname: string): boolean {
   if (hostname === "localhost" || hostname.endsWith(".localhost")) return true
@@ -177,13 +181,21 @@ const offscreenJobSchema = z.strictObject({
   nonce: nonceSchema,
   providerSystemLabel: z.string().min(1),
   prompt: z.string(),
-  pngBytes: z.union([z.instanceof(ArrayBuffer), z.instanceof(Blob)]),
+  sourceUrl: sourceUrlSchema.exactOptional(),
 })
 
 const offscreenAckSchema = z.strictObject({
   version: z.literal(MESSAGE_VERSION),
   type: z.literal("offscreen_ack"),
   nonce: nonceSchema,
+  blobUrl: z.string().startsWith("blob:"),
+})
+
+const offscreenRevokeSchema = z.strictObject({
+  version: z.literal(MESSAGE_VERSION),
+  type: z.literal("offscreen_revoke"),
+  nonce: nonceSchema,
+  blobUrl: z.string().startsWith("blob:"),
 })
 
 const statusNotificationSchema = z.discriminatedUnion("status", [
@@ -215,6 +227,7 @@ const messageSchemas = {
   message_rejected: messageRejectedSchema,
   offscreen_job: offscreenJobSchema,
   offscreen_ack: offscreenAckSchema,
+  offscreen_revoke: offscreenRevokeSchema,
   status_notification: statusNotificationSchema,
 } as const
 

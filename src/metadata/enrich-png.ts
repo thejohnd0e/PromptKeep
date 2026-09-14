@@ -5,16 +5,18 @@ import {
   type Sha256Digest,
   sha256Digest,
 } from "../shared/contracts"
+import { buildExifProfile } from "./exif-profile"
 import { CONTROLLED_DIGITAL_SOURCE_TYPE, readIptcAiXmp, writeIptcAiXmp } from "./iptc-ai"
 import { PNG_SIGNATURE, parsePng } from "./png-parser"
 import type { PngFailure } from "./png-types"
-import { insertXmpItxt } from "./png-writer"
+import { buildParametersText, insertPngMetadata } from "./png-writer"
 import type { XmpFailure } from "./xmp-types"
 
 export type ReadyAssociation = {
   readonly provider: Provider
   readonly originalPrompt: string
   readonly observedVersion?: string
+  readonly sourceUrl?: string
 }
 
 export type EnrichPngOptions = { readonly acknowledgeCaBX?: boolean }
@@ -224,7 +226,13 @@ export function enrichPng(
     ...(version === undefined ? {} : { observedVersion: version }),
   })
   if (written.kind === "rejected") return { kind: "rejected", error: mapXmpFailure(written.error) }
-  const inserted = insertXmpItxt(input, written.value)
+  const sourceUrl = association.sourceUrl?.trim() ?? ""
+  const inserted = insertPngMetadata(input, {
+    xmpData: written.value,
+    exifData: buildExifProfile({ description: association.originalPrompt, software: system }),
+    parametersText: buildParametersText(association.originalPrompt),
+    ...(sourceUrl === "" ? {} : { sourceUrl }),
+  })
   if (inserted.kind === "rejected")
     return { kind: "rejected", error: mapPngFailure(inserted.error) }
   const output = inserted.value

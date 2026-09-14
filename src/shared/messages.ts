@@ -20,6 +20,7 @@ export type {
   MessageSender,
   OffscreenAckMessage,
   OffscreenJobMessage,
+  OffscreenRevokeMessage,
   OperationAcceptedMessage,
   OperationRejectedMessage,
   SenderRejection,
@@ -67,6 +68,8 @@ export function parseInboundMessage(value: unknown, now: UnixMilliseconds): Mess
       return parseWith(messageSchemas.offscreen_job, value)
     case "offscreen_ack":
       return parseWith(messageSchemas.offscreen_ack, value)
+    case "offscreen_revoke":
+      return parseWith(messageSchemas.offscreen_revoke, value)
     case "status_notification":
       return parseWith(messageSchemas.status_notification, value)
     default:

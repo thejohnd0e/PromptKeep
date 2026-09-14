@@ -49,11 +49,9 @@ export type DownloadResult =
   | { readonly kind: "ok"; readonly downloadId: number }
   | { readonly kind: "rejected"; readonly error: DownloadError }
 
-export type Downloader = (bytes: Uint8Array, filenameBase: string) => Promise<DownloadResult>
+export type Downloader = (sourceUrl: string, filenameBase: string) => Promise<DownloadResult>
 
 export type DownloaderDeps = {
-  readonly createObjectUrl: (blob: Blob) => string
-  readonly revokeObjectUrl: (url: string) => void
   readonly download: (options: DownloadOptions) => Promise<number>
   readonly waitForDownload: (downloadId: number) => Promise<DownloadOutcome>
 }
@@ -204,12 +202,14 @@ function isTransient(result: AssetFetchResult): boolean {
 }
 
 export function createDownloader(deps: DownloaderDeps): Downloader {
-  return async (bytes, filenameBase) => {
+  return async (sourceUrl, filenameBase) => {
     const filename = `${sanitizeFilenameBase(filenameBase)}-ai-prompt.png`
-    const blob = new Blob([bytes.slice()], { type: "image/png" })
-    const blobUrl = deps.createObjectUrl(blob)
     try {
-      const downloadId = await deps.download({ url: blobUrl, filename, conflictAction: "uniquify" })
+      const downloadId = await deps.download({
+        url: sourceUrl,
+        filename,
+        conflictAction: "uniquify",
+      })
       const outcome = await deps.waitForDownload(downloadId)
       if (outcome.kind === "interrupted") {
         const error: DownloadError =
@@ -221,8 +221,6 @@ export function createDownloader(deps: DownloaderDeps): Downloader {
       return { kind: "ok", downloadId }
     } catch {
       return { kind: "rejected", error: { code: "DOWNLOAD_FAILED" } }
-    } finally {
-      deps.revokeObjectUrl(blobUrl)
     }
   }
 }

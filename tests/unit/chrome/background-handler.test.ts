@@ -65,6 +65,9 @@ function createDeps(overrides: Partial<BackgroundDeps> = {}) {
   const calls = {
     fetched: [] as string[],
     sent: [] as unknown[],
+    downloaded: [] as string[],
+    saved: [] as string[],
+    deleted: [] as string[],
     ensureOffscreen: 0,
   }
   const deps: BackgroundDeps = {
@@ -74,13 +77,37 @@ function createDeps(overrides: Partial<BackgroundDeps> = {}) {
       calls.fetched.push(url)
       return { kind: "ok", bytes: buildValidPng() }
     },
+    assetTransfer: {
+      save: async (nonce) => {
+        calls.saved.push(nonce)
+      },
+      take: async () => undefined,
+      delete: async (nonce) => {
+        calls.deleted.push(nonce)
+      },
+    },
     ensureOffscreenDocument: async () => {
       calls.ensureOffscreen += 1
     },
     sendMessage: async (message) => {
       calls.sent.push(message)
-      const job = message as OffscreenJobMessage
-      return { version: MESSAGE_VERSION, type: "offscreen_ack", nonce: job.nonce }
+      if (message.type === "offscreen_job") {
+        return {
+          version: MESSAGE_VERSION,
+          type: "offscreen_ack",
+          nonce: message.nonce,
+          blobUrl: "blob:chrome-extension://test/ack",
+        }
+      }
+      return {
+        version: MESSAGE_VERSION,
+        type: "message_rejected",
+        reason: { code: "MESSAGE_UNKNOWN_TYPE" },
+      }
+    },
+    downloadBlobUrl: async (sourceUrl, filenameBase) => {
+      calls.downloaded.push(`${sourceUrl}:${filenameBase}`)
+      return { kind: "ok", downloadId: 42 }
     },
     now: () => NOW,
     ...overrides,
@@ -89,7 +116,7 @@ function createDeps(overrides: Partial<BackgroundDeps> = {}) {
 }
 
 describe("background initiate handler", () => {
-  it("fetches the asset, sends an offscreen job, and completes the operation", async () => {
+  it("transfers fetched bytes to offscreen and completes the operation", async () => {
     const { deps, calls, jobStore } = createDeps()
     const message = validInitiateMessage()
     const result = await handleInitiateOperation(message, deps)
@@ -99,8 +126,10 @@ describe("background initiate handler", () => {
       nonce: message.nonce,
     })
     expect(calls.fetched).toEqual(["https://chatgpt.com/asset/1.png"])
+    expect(calls.saved).toEqual([message.nonce])
+    expect(calls.deleted).toEqual([message.nonce])
     expect(calls.ensureOffscreen).toBe(1)
-    expect(calls.sent).toHaveLength(1)
+    expect(calls.sent).toHaveLength(2)
     const job = calls.sent[0]
     expect(job).toBeDefined()
     if (job !== undefined) {
@@ -112,15 +141,16 @@ describe("background initiate handler", () => {
         providerSystemLabel: "ChatGPT",
         prompt: "a cute corgi",
       })
-      expect(offscreenJob.pngBytes).toBeInstanceOf(ArrayBuffer)
+      expect("pngBytes" in offscreenJob).toBe(false)
     }
+    expect(calls.downloaded).toEqual(["blob:chrome-extension://test/ack:nonce-0000000000000001"])
     expect(await jobStore.get(message.nonce)).toEqual({
       kind: "rejected",
       error: { code: "JOB_NOT_FOUND" },
     })
   })
 
-  it("rejects a replayed nonce without fetching", async () => {
+  it("rejects a replayed nonce without fetching again", async () => {
     const { deps, calls } = createDeps()
     const message = validInitiateMessage()
     await handleInitiateOperation(message, deps)
@@ -131,6 +161,7 @@ describe("background initiate handler", () => {
       nonce: message.nonce,
       error: { code: "operation_cancelled" },
     })
+    expect(calls.sent).toHaveLength(2)
     expect(calls.fetched).toHaveLength(1)
   })
 
@@ -238,6 +269,6 @@ describe("background initiate handler", () => {
       nonce: message.nonce,
       error: { code: "operation_cancelled" },
     })
-    expect(calls.fetched).toHaveLength(0)
+    expect(calls.sent).toHaveLength(0)
   })
 })

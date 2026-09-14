@@ -12,6 +12,7 @@ coverage/
 
 # Tooling caches
 .playwright-mcp/
+.codegraph/
 *.tsbuildinfo
 
 # Orchestrator internal state (plans, evidence, sessions, ledger)

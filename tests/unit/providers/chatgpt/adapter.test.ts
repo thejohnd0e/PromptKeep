@@ -21,7 +21,7 @@ const PROMPT = "A red fox in the snow"
 
 describe("chatgpt adapter", () => {
   it("pins the selectors version", () => {
-    expect(CHATGPT_SELECTORS_VERSION).toBe(1)
+    expect(CHATGPT_SELECTORS_VERSION).toBe(2)
   })
 
   it("success-current-turn: reconciles prompt and classifies one proven image", () => {
@@ -34,7 +34,20 @@ describe("chatgpt adapter", () => {
     expect(result.association).toBe("provider_identity")
     expect(result.images.length).toBe(1)
     expect(result.images[0]?.candidate.sourceUrl).toContain("oaiusercontent.com")
-    expect(result.images[0]?.hasDownloadControl).toBe(true)
+    expect(result.images[0]?.proven).toBe(true)
+  })
+
+  it("current image-only turn: detects one visible estuary image from data-turn roles", () => {
+    const doc = fixture("current-estuary")
+
+    const result = captureChatGptTurn(doc, PROMPT, NOW, CAPTURE_ID)
+
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    expect(result.promptCapture.providerTurnId).toBe("chatgpt:assistant-1")
+    expect(result.association).toBe("provider_identity")
+    expect(result.images).toHaveLength(1)
+    expect(result.images[0]?.candidate.sourceUrl).toContain("/backend-api/estuary/content")
   })
 
   it("historical-turn: matches the prompt in an earlier visible turn", () => {

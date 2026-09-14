@@ -309,15 +309,8 @@ describe("asset fetcher", () => {
 })
 
 describe("downloader", () => {
-  it("downloads bytes under a uniquify filename and revokes the blob url", async () => {
-    const created: string[] = []
-    const revoked: string[] = []
+  it("downloads the blob url under a uniquify filename", async () => {
     const downloader = createDownloader({
-      createObjectUrl: (blob) => {
-        created.push(blob.type)
-        return "blob:test-1"
-      },
-      revokeObjectUrl: (url) => revoked.push(url),
       download: async (options) => {
         expect(options).toEqual({
           url: "blob:test-1",
@@ -331,104 +324,75 @@ describe("downloader", () => {
         return { kind: "completed" }
       },
     })
-    const result = await downloader(pngBytes, "corgi")
+    const result = await downloader("blob:test-1", "corgi")
     expect(result).toEqual({ kind: "ok", downloadId: 42 })
-    expect(created).toEqual(["image/png"])
-    expect(revoked).toEqual(["blob:test-1"])
   })
 
   it("sanitizes forbidden filename characters", async () => {
     const filenames: string[] = []
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async (options) => {
         filenames.push(options.filename ?? "")
         return 1
       },
       waitForDownload: async () => ({ kind: "completed" }),
     })
-    await downloader(pngBytes, 'a<b>c:d"e/f\\g|h?i*j')
+    await downloader("blob:test", 'a<b>c:d"e/f\\g|h?i*j')
     expect(filenames).toEqual(["abcdefghij-ai-prompt.png"])
   })
 
   it("trims edge dots and spaces from the filename base", async () => {
     const filenames: string[] = []
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async (options) => {
         filenames.push(options.filename ?? "")
         return 1
       },
       waitForDownload: async () => ({ kind: "completed" }),
     })
-    await downloader(pngBytes, "  ..corgi..  ")
+    await downloader("blob:test", "  ..corgi..  ")
     expect(filenames).toEqual(["corgi-ai-prompt.png"])
   })
 
   it("falls back to a safe base when the filename is entirely invalid", async () => {
     const filenames: string[] = []
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async (options) => {
         filenames.push(options.filename ?? "")
         return 1
       },
       waitForDownload: async () => ({ kind: "completed" }),
     })
-    await downloader(pngBytes, "///")
+    await downloader("blob:test", "///")
     expect(filenames).toEqual(["image-ai-prompt.png"])
   })
 
   it("maps a user-cancelled download to DOWNLOAD_CANCELLED", async () => {
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async () => 7,
       waitForDownload: async () => ({ kind: "interrupted", error: "USER_CANCELED" }),
     })
-    const result = await downloader(pngBytes, "corgi")
+    const result = await downloader("blob:test", "corgi")
     expect(result).toEqual({ kind: "rejected", error: { code: "DOWNLOAD_CANCELLED" } })
   })
 
   it("maps a failed download to DOWNLOAD_FAILED", async () => {
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async () => 7,
       waitForDownload: async () => ({ kind: "interrupted", error: "NETWORK_FAILED" }),
     })
-    const result = await downloader(pngBytes, "corgi")
+    const result = await downloader("blob:test", "corgi")
     expect(result).toEqual({ kind: "rejected", error: { code: "DOWNLOAD_FAILED" } })
   })
 
   it("reports DOWNLOAD_FAILED when the download API rejects", async () => {
     const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: () => {},
       download: async () => {
         throw new Error("downloads unavailable")
       },
       waitForDownload: async () => ({ kind: "completed" }),
     })
-    const result = await downloader(pngBytes, "corgi")
+    const result = await downloader("blob:test", "corgi")
     expect(result).toEqual({ kind: "rejected", error: { code: "DOWNLOAD_FAILED" } })
-  })
-
-  it("revokes the blob url even when the download fails", async () => {
-    const revoked: string[] = []
-    const downloader = createDownloader({
-      createObjectUrl: () => "blob:test",
-      revokeObjectUrl: (url) => revoked.push(url),
-      download: async () => {
-        throw new Error("boom")
-      },
-      waitForDownload: async () => ({ kind: "completed" }),
-    })
-    const result = await downloader(pngBytes, "corgi")
-    expect(result.kind).toBe("rejected")
-    expect(revoked).toEqual(["blob:test"])
   })
 })

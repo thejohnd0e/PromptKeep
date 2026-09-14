@@ -1,0 +1,145 @@
+# AI Prompt Image Metadata
+
+A local-only Chrome extension that saves AI-generated images **together with the prompt
+that produced them**. It adds a small download control to generated images on ChatGPT,
+Google Gemini, and Grok, then embeds the prompt as standard IPTC AI metadata in the
+downloaded PNG.
+
+No backend, no accounts, no telemetry — the prompt never leaves your machine.
+
+---
+
+## What it does
+
+1. Detects generated images on supported provider pages and overlays a round white **A**
+   button (visible on hover, top-right corner of the image).
+2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it as
+   `<original-name>-ai-prompt.png`.
+3. Leaves the pixels untouched and copies every unrelated PNG chunk byte-for-byte,
+   including the original CRCs and any `caBX` (C2PA) payload.
+
+## Metadata written
+
+| Location | Field | Value |
+| --- | --- | --- |
+| XMP (`iTXt`) | `Iptc4xmpExt:AIPromptInformation` | the original user prompt |
+| XMP (`iTXt`) | `Iptc4xmpExt:AISystemUsed` | `ChatGPT`, `Google Gemini`, or `Grok` |
+| XMP (`iTXt`) | `Iptc4xmpExt:AISystemVersionUsed` | observed model version, when visible |
+| XMP (`iTXt`) | `Iptc4xmpExt:DigitalSourceType` | `http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia` |
+| PNG text (`iTXt`, UTF-8) | `parameters` | the prompt under the Stable Diffusion-compatible keyword |
+| PNG text (`tEXt`) | `Source` | the full page URL of the conversation |
+| `eXIf` | `ImageDescription`, `Software`, `UserComment`, `XPComment` | prompt and system label |
+| `caBX` | — | preserved byte-for-byte; never altered or removed |
+
+`parameters` is written as UTF-8 `iTXt`, so non-Latin-1 prompts (Cyrillic, CJK, emoji)
+survive exactly. No Latin-1 `tEXt` copy is emitted, because it would turn the same prompt
+into mojibake.
+
+The `eXIf` block is skipped when the source PNG contains a `caBX` chunk. ExifTool has a
+known bug ([exiftool/exiftool#452](https://github.com/exiftool/exiftool/issues/452)) that
+makes it mis-parse a PNG containing both chunks, so the extension avoids the collision.
+The prompt remains fully available through XMP and `parameters`.
+
+## Reading the prompt back
+
+- **ExifTool** / **ExifToolGUI** — shows `PNG:Parameters`, `PNG:Source`, and
+  `XMP-iptcExt:AIPromptInformation`.
+- **Eagle 4.0 Beta 17+** — the bundled inspector plugin displays the IPTC AI fields and can
+  copy the prompt into the item annotation. The community *Stable Diffusion Metadata* plugin
+  also works, since it reads the `parameters` keyword.
+
+## Installation
+
+### Chrome extension
+
+```bash
+npm ci
+npm run build
+```
+
+Then open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and
+select the generated `dist/chrome` directory.
+
+### Eagle plugin (optional)
+
+```bash
+npm run build:eagle
+```
+
+In Eagle, open **Plugin → Developer Options → Import Local Project** and select
+`dist/eagle-plugin`. The plugin registers an inspector for PNG files and requires
+Eagle 4.0 Beta 17 or newer.
+
+## Requirements
+
+- Node.js >= 22.12.0 and npm >= 10.9.2 (development only)
+- Google Chrome (Manifest V3)
+- Eagle 4.0 Beta 17+ (only for the optional inspector plugin)
+
+## Architecture
+
+Three isolated layers keep volatile provider integrations away from the byte-level writer:
+
+- **Provider adapters** (`src/providers/`) — versioned DOM selectors for ChatGPT, Gemini,
+  and Grok. Each adapter pairs a rendered user turn with the generated images inside the
+  assistant turn that follows it, and fails closed (asking for explicit confirmation)
+  when identity cannot be proven.
+- **Extension shell** (`src/chrome/`, `src/offscreen/`) — a Manifest V3 service worker
+  validates sender origin and message schemas, fetches the asset through an allow-list,
+  and hands the bytes to an offscreen document.
+- **Metadata core** (`src/metadata/`) — a bounded, byte-preserving PNG chunk writer. It
+  validates every chunk CRC, inserts the new chunks before the first `IDAT`, and never
+  decodes or re-encodes image data through Canvas.
+
+See [`CODEX.md`](./CODEX.md) for a detailed project state log and implementation notes.
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run test:unit        # Vitest unit suites
+npm run test:property    # fast-check property tests
+npm run build            # dist/chrome + dist/eagle-plugin
+npm run test:e2e         # Playwright against the production MV3 build
+npm run test:eagle       # Eagle inspector tests
+```
+
+`npm run verify` runs the full gate set, including the manifest and workspace auditors.
+
+### End-to-end testing
+
+`npm run test:e2e` loads the **production build** (`dist/chrome`) into a persistent
+Chromium context, serves provider-shaped fixture pages locally, clicks the injected
+control, and reads the exact downloaded bytes from disk. Assertions run against an
+independent PNG parser in `tests/e2e/png-verify.ts`, so the writer never validates itself.
+
+## Limitations
+
+- **Chrome only.** Manifest V3; no Firefox, Safari, or mobile builds.
+- **PNG only.** JPEG, WebP, AVIF, and animated formats are out of scope.
+- **Fixtures, not live provider contracts.** ChatGPT, Gemini, and Grok change their DOM
+  without notice. When a layout changes, the affected adapter fails closed and no file is
+  produced until its versioned selectors are refreshed.
+- **`parameters` is `iTXt`.** Tooling that scans only `tEXt`/`zTXt` will not see it. This
+  is a deliberate trade-off in favour of correct non-Latin-1 prompts; XMP remains the
+  standards-compliant channel.
+- **C2PA is preserved, not re-signed.** When a source PNG contains `caBX`, the extension
+  keeps it byte-for-byte, but the embedded signature no longer verifies for the modified
+  file. No validity is ever claimed.
+- **EXIF ASCII fields transliterate.** `ImageDescription`/`Software` are ASCII; non-ASCII
+  characters become `?`. The full prompt lives in the UTF-8 XMP and `parameters` fields.
+
+## Privacy
+
+Everything runs locally in the browser. The extension:
+
+- ships no remote code, uses no analytics, and sends no prompt anywhere;
+- requests only `storage`, `downloads`, and `offscreen`, plus the exact provider hosts;
+- keeps operation state in `chrome.storage.session` and deletes it after completion;
+- never uploads, logs, or persists the raw prompt beyond the download itself.
+
+## License
+
+No license has been chosen for this repository yet.

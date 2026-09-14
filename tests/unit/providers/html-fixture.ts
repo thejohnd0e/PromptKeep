@@ -82,7 +82,7 @@ export function matches(node: FixtureNode, selector: string): boolean {
 
 function matchSimple(node: FixtureNode, selector: string): boolean {
   const tagPattern = /^([a-zA-Z][a-zA-Z0-9-]*)?/
-  const attrPattern = /\[([a-zA-Z-]+)([*^]?)=(?:"([^"]*)"|'([^']*)')?\]/gu
+  const attrPattern = /\[([a-zA-Z-]+)(?:([*^]?)=(?:"([^"]*)"|'([^']*)'))?\]/gu
   const classPattern = /\.([a-zA-Z0-9_-]+)/gu
   const idPattern = /#([a-zA-Z0-9_-]+)/
 
@@ -135,10 +135,12 @@ export function fullText(node: FixtureNode): string {
 export class FixtureElement {
   readonly #node: FixtureNode
   readonly parentElement: FixtureElement | null
+  readonly tagName: string
 
   constructor(node: FixtureNode, parent: FixtureElement | null) {
     this.#node = node
     this.parentElement = parent
+    this.tagName = node.tag.toUpperCase()
   }
 
   get textContent(): string {
@@ -151,15 +153,11 @@ export class FixtureElement {
   }
 
   querySelector(selector: string): FixtureElement | null {
-    return (
-      queryAll(this.#node, selector)
-        .map((child) => this.#wrap(child))
-        .find(() => true) ?? null
-    )
+    return this.querySelectorAll(selector)[0] ?? null
   }
 
   querySelectorAll(selector: string): FixtureElement[] {
-    return queryAll(this.#node, selector).map((child) => this.#wrap(child))
+    return queryAll(this.#node, selector).map((child) => this.#wrapTree(child))
   }
 
   closest(selector: string): FixtureElement | null {
@@ -171,8 +169,34 @@ export class FixtureElement {
     return null
   }
 
-  #wrap(node: FixtureNode): FixtureElement {
-    return new FixtureElement(node, this)
+  /**
+   * Wraps a matched node together with its real ancestor chain so
+   * parentElement/closest walk the actual fixture hierarchy.
+   */
+  #wrapTree(node: FixtureNode): FixtureElement {
+    const chain: FixtureNode[] = []
+    let current: FixtureNode | undefined = node
+    while (current !== undefined) {
+      chain.unshift(current)
+      current = this.#findParent(current)
+    }
+    let wrapper: FixtureElement | null = null
+    for (const ancestor of chain) {
+      wrapper = new FixtureElement(ancestor, wrapper)
+    }
+    return wrapper ?? new FixtureElement(node, null)
+  }
+
+  #findParent(target: FixtureNode): FixtureNode | undefined {
+    const visit = (node: FixtureNode): FixtureNode | undefined => {
+      for (const child of node.children) {
+        if (child === target) return node
+        const found = visit(child)
+        if (found !== undefined) return found
+      }
+      return undefined
+    }
+    return visit(this.#node)
   }
 }
 
