@@ -26,8 +26,7 @@ async function runVite(target) {
 }
 
 async function main() {
-  const requestedTarget = process.argv[2]
-  const targets = requestedTarget === "eagle" ? ["eagle"] : ["chrome", "content", "eagle"]
+  const targets = ["chrome", "content"]
   await rm(resolve(ROOT, "dist"), { recursive: true, force: true })
   for (const target of targets) {
     await runVite(target)
@@ -53,11 +52,6 @@ async function main() {
     ).replace("./offscreen.ts", "./offscreen.js")
     await writeFile(resolve(ROOT, "dist/chrome/offscreen.html"), offscreenHtml)
   }
-  await mkdir(resolve(ROOT, "dist/eagle-plugin"), { recursive: true })
-  await copyFile(
-    resolve(ROOT, "eagle-plugin/manifest.json"),
-    resolve(ROOT, "dist/eagle-plugin/manifest.json"),
-  )
 }
 
 await main()

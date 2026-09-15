@@ -1,21 +1,17 @@
 # Dependencies
 node_modules/
 
-# Build / dist output
-dist/
-
-# Test artifacts
-test-results/
-playwright-report/
-coverage/
-.vite/
+# Build output
+dist/*
+!dist/chrome/
+!dist/chrome/**
 
 # Tooling caches
 .playwright-mcp/
 .codegraph/
 *.tsbuildinfo
 
-# Orchestrator internal state (plans, evidence, sessions, ledger)
+# Local tooling state
 .omo/
 
 # OS

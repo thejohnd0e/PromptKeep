@@ -19,15 +19,11 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node"]
   },
   "include": [
     "src/**/*.ts",
-    "eagle-plugin/**/*.ts",
-    "tests/**/*.ts",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "playwright.config.ts"
+    "vite.config.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

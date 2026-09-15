@@ -44,9 +44,6 @@ The prompt remains fully available through XMP and `parameters`.
 
 - **ExifTool** / **ExifToolGUI** — shows `PNG:Parameters`, `PNG:Source`, and
   `XMP-iptcExt:AIPromptInformation`.
-- **Eagle 4.0 Beta 17+** — the bundled inspector plugin displays the IPTC AI fields and can
-  copy the prompt into the item annotation. The community *Stable Diffusion Metadata* plugin
-  also works, since it reads the `parameters` keyword.
 
 ## Installation
 
@@ -60,21 +57,10 @@ npm run build
 Then open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and
 select the generated `dist/chrome` directory.
 
-### Eagle plugin (optional)
-
-```bash
-npm run build:eagle
-```
-
-In Eagle, open **Plugin → Developer Options → Import Local Project** and select
-`dist/eagle-plugin`. The plugin registers an inspector for PNG files and requires
-Eagle 4.0 Beta 17 or newer.
-
 ## Requirements
 
 - Node.js >= 22.12.0 and npm >= 10.9.2 (development only)
 - Google Chrome (Manifest V3)
-- Eagle 4.0 Beta 17+ (only for the optional inspector plugin)
 
 ## Architecture
 
@@ -90,30 +76,6 @@ Three isolated layers keep volatile provider integrations away from the byte-lev
 - **Metadata core** (`src/metadata/`) — a bounded, byte-preserving PNG chunk writer. It
   validates every chunk CRC, inserts the new chunks before the first `IDAT`, and never
   decodes or re-encodes image data through Canvas.
-
-See [`CODEX.md`](./CODEX.md) for a detailed project state log and implementation notes.
-
-## Development
-
-```bash
-npm ci
-npm run typecheck
-npm run lint
-npm run test:unit        # Vitest unit suites
-npm run test:property    # fast-check property tests
-npm run build            # dist/chrome + dist/eagle-plugin
-npm run test:e2e         # Playwright against the production MV3 build
-npm run test:eagle       # Eagle inspector tests
-```
-
-`npm run verify` runs the full gate set, including the manifest and workspace auditors.
-
-### End-to-end testing
-
-`npm run test:e2e` loads the **production build** (`dist/chrome`) into a persistent
-Chromium context, serves provider-shaped fixture pages locally, clicks the injected
-control, and reads the exact downloaded bytes from disk. Assertions run against an
-independent PNG parser in `tests/e2e/png-verify.ts`, so the writer never validates itself.
 
 ## Limitations
 
@@ -142,4 +104,4 @@ Everything runs locally in the browser. The extension:
 
 ## License
 
-No license has been chosen for this repository yet.
+[MIT](./LICENSE)
