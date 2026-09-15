@@ -54,8 +54,13 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   control.className = "aip2e-control"
   control.style.position = "absolute"
   control.style.zIndex = "2147483647"
-  control.style.top = "8px"
-  control.style.right = "8px"
+  if (config.provider === "gemini") {
+    control.style.top = "44px"
+    control.style.right = "8px"
+  } else {
+    control.style.top = "8px"
+    control.style.right = "8px"
+  }
   control.style.opacity = "0"
   control.style.pointerEvents = "none"
   control.style.transition = "opacity 120ms ease"

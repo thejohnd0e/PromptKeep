@@ -56,7 +56,7 @@ describe("public workspace contracts", () => {
       { code: "association_ambiguous", candidateCount: 2 },
       { code: "confirmation_required", candidateCount: 1 },
       { code: "unsupported_media_type", mediaType: "image/jpeg" },
-      { code: "download_failed", status: 503 },
+      { code: "download_failed", status: 503, reason: "NETWORK_FAILED" },
       { code: "input_too_large", actualBytes: 104_857_601, limitBytes: 104_857_600 },
       { code: "invalid_png", reason: "bad signature" },
       { code: "unsupported_png", feature: "APNG" },

@@ -19,6 +19,7 @@ export type PngTaskResult =
 
 export type PngTaskDeps = {
   readonly loadAsset: (nonce: OperationNonce) => Promise<Uint8Array | undefined>
+  readonly rasterToPng?: (input: Uint8Array) => Promise<Uint8Array>
 }
 
 const PROVIDER_BY_SYSTEM_LABEL: Readonly<Record<string, Provider>> = {
@@ -45,13 +46,55 @@ function mapEnrichError(error: EnrichPngError): EnrichmentError {
   }
 }
 
-/**
- * Enriches the PNG bytes and exposes the result as a Blob URL. The offscreen
- * document is the only extension context with both DOM access (for Blob URL
- * creation) and the enrichment pipeline; the actual chrome.downloads call
- * happens in the service worker because offscreen documents can only use the
- * chrome.runtime API.
- */
+function isPngSignature(input: Uint8Array): boolean {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const
+  if (input.byteLength < signature.length) return false
+  return signature.every((byte, index) => input[index] === byte)
+}
+
+function detectMediaType(input: Uint8Array): string {
+  if (input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff) return "image/jpeg"
+  if (
+    input[0] === 0x52 &&
+    input[1] === 0x49 &&
+    input[2] === 0x46 &&
+    input[3] === 0x46 &&
+    input[8] === 0x57 &&
+    input[9] === 0x45 &&
+    input[10] === 0x42 &&
+    input[11] === 0x50
+  ) {
+    return "image/webp"
+  }
+  if (input[0] === 0x47 && input[1] === 0x49 && input[2] === 0x46) return "image/gif"
+  return "application/octet-stream"
+}
+
+async function rasterToPng(input: Uint8Array): Promise<Uint8Array> {
+  if (isPngSignature(input)) return input
+  const image = await createImageBitmap(new Blob([input.slice()]))
+  try {
+    if (typeof OffscreenCanvas !== "undefined") {
+      const canvas = new OffscreenCanvas(image.width, image.height)
+      const context = canvas.getContext("2d")
+      if (context === null) throw new Error("2d context unavailable")
+      context.drawImage(image, 0, 0)
+      return new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer())
+    }
+    const canvas = document.createElement("canvas")
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext("2d")
+    if (context === null) throw new Error("2d context unavailable")
+    context.drawImage(image, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"))
+    if (blob === null) throw new Error("png conversion failed")
+    return new Uint8Array(await blob.arrayBuffer())
+  } finally {
+    image.close()
+  }
+}
+
 export async function runPngTask(
   request: PngTaskRequest,
   deps: PngTaskDeps,
@@ -65,8 +108,17 @@ export async function runPngTask(
   }
   const input = await deps.loadAsset(request.nonce)
   if (input === undefined) return rejected(request.nonce, { code: "operation_cancelled" })
+  let pngInput: Uint8Array
+  try {
+    pngInput = await (deps.rasterToPng ?? rasterToPng)(input)
+  } catch {
+    return rejected(request.nonce, {
+      code: "unsupported_media_type",
+      mediaType: detectMediaType(input),
+    })
+  }
   const enriched = enrichPng(
-    input,
+    pngInput,
     {
       provider,
       originalPrompt: request.prompt,

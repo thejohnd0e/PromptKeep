@@ -27,6 +27,10 @@ declare global {
 
       function sendMessage(message: unknown): Promise<unknown>
 
+      function getURL(path: string): string
+
+      function getManifest(): { readonly version: string }
+
       type RuntimeContextType =
         | "TAB"
         | "OFFSCREEN_DOCUMENT"

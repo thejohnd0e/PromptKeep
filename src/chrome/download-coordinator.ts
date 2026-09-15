@@ -1,5 +1,5 @@
 import { PNG_SIGNATURE } from "../metadata/png-parser"
-import type { ImageUrl } from "../shared/contracts"
+import { type ImageUrl, imageUrl } from "../shared/contracts"
 import type { AssetPolicy } from "./asset-policy"
 
 export type AssetFetchError =
@@ -42,7 +42,7 @@ export type DownloadOutcome =
   | { readonly kind: "interrupted"; readonly error?: string }
 
 export type DownloadError =
-  | { readonly code: "DOWNLOAD_FAILED" }
+  | { readonly code: "DOWNLOAD_FAILED"; readonly reason?: string }
   | { readonly code: "DOWNLOAD_CANCELLED" }
 
 export type DownloadResult =
@@ -57,6 +57,7 @@ export type DownloaderDeps = {
 }
 
 const FORBIDDEN_FILENAME_CHARS = /[<>:"/\\|?*]/u
+const MAX_REDIRECTS = 5
 
 export function sanitizeFilenameBase(value: string): string {
   const stripped = value
@@ -83,7 +84,23 @@ function isPngSignature(input: Uint8Array): boolean {
 function detectMediaType(input: Uint8Array): string {
   if (input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff) return "image/jpeg"
   if (input[0] === 0x47 && input[1] === 0x49 && input[2] === 0x46) return "image/gif"
+  if (
+    input[0] === 0x52 &&
+    input[1] === 0x49 &&
+    input[2] === 0x46 &&
+    input[3] === 0x46 &&
+    input[8] === 0x57 &&
+    input[9] === 0x45 &&
+    input[10] === 0x42 &&
+    input[11] === 0x50
+  ) {
+    return "image/webp"
+  }
   return "application/octet-stream"
+}
+
+function isSupportedRasterType(mediaType: string): boolean {
+  return mediaType === "image/png" || mediaType === "image/jpeg" || mediaType === "image/webp"
 }
 
 async function readBounded(
@@ -117,6 +134,7 @@ async function fetchAssetOnce(
   deps: AssetFetcherDeps,
   sourceUrl: ImageUrl,
   signal: AbortSignal | undefined,
+  redirectCount = 0,
 ): Promise<AssetFetchResult> {
   if (isAborted(signal)) {
     return { kind: "rejected", error: { code: "ASSET_CANCELLED" } }
@@ -132,21 +150,43 @@ async function fetchAssetOnce(
   try {
     let response: Response
     try {
-      response = await deps.fetchImpl(sourceUrl, { redirect: "manual", signal: controller.signal })
+      response = await deps.fetchImpl(sourceUrl, {
+        credentials: "include",
+        redirect: "manual",
+        signal: controller.signal,
+      })
     } catch {
       if (timedOut) return { kind: "rejected", error: { code: "ASSET_TIMEOUT" } }
       if (isAborted(signal)) return { kind: "rejected", error: { code: "ASSET_CANCELLED" } }
       return { kind: "rejected", error: { code: "ASSET_FETCH_FAILED" } }
     }
-    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    if (response.type === "opaqueredirect") {
       return { kind: "rejected", error: { code: "ASSET_REDIRECT_DENIED" } }
+    }
+    if (response.status >= 300 && response.status < 400) {
+      if (redirectCount >= MAX_REDIRECTS) {
+        return { kind: "rejected", error: { code: "ASSET_REDIRECT_DENIED" } }
+      }
+      const location = response.headers.get("location")
+      if (location === null) {
+        return { kind: "rejected", error: { code: "ASSET_REDIRECT_DENIED" } }
+      }
+      const nextUrl = new URL(location, sourceUrl).toString()
+      const policyResult = deps.policy(nextUrl)
+      if (policyResult.kind === "rejected") {
+        return { kind: "rejected", error: policyResult.error }
+      }
+      return fetchAssetOnce(deps, imageUrl(policyResult.url.toString()), signal, redirectCount + 1)
     }
     if (!response.ok) {
       return { kind: "rejected", error: { code: "ASSET_BAD_STATUS", status: response.status } }
     }
     const contentType = response.headers.get("content-type")
-    if (contentType !== null && !contentType.toLowerCase().startsWith("image/png")) {
-      return { kind: "rejected", error: { code: "ASSET_BAD_MEDIA_TYPE", mediaType: contentType } }
+    if (contentType !== null) {
+      const contentMediaType = contentType.split(";")[0]?.trim().toLowerCase() ?? ""
+      if (!isSupportedRasterType(contentMediaType)) {
+        return { kind: "rejected", error: { code: "ASSET_BAD_MEDIA_TYPE", mediaType: contentType } }
+      }
     }
     const contentLength = Number(response.headers.get("content-length") ?? "0")
     if (Number.isFinite(contentLength) && contentLength > deps.maxBytes) {
@@ -166,11 +206,9 @@ async function fetchAssetOnce(
         },
       }
     }
-    if (!isPngSignature(read.bytes)) {
-      return {
-        kind: "rejected",
-        error: { code: "ASSET_NOT_PNG", mediaType: detectMediaType(read.bytes) },
-      }
+    const mediaType = isPngSignature(read.bytes) ? "image/png" : detectMediaType(read.bytes)
+    if (!isSupportedRasterType(mediaType)) {
+      return { kind: "rejected", error: { code: "ASSET_BAD_MEDIA_TYPE", mediaType } }
     }
     return { kind: "ok", bytes: read.bytes }
   } catch {
@@ -215,7 +253,10 @@ export function createDownloader(deps: DownloaderDeps): Downloader {
         const error: DownloadError =
           outcome.error === "USER_CANCELED"
             ? { code: "DOWNLOAD_CANCELLED" }
-            : { code: "DOWNLOAD_FAILED" }
+            : {
+                code: "DOWNLOAD_FAILED",
+                ...(outcome.error === undefined ? {} : { reason: outcome.error }),
+              }
         return { kind: "rejected", error }
       }
       return { kind: "ok", downloadId }

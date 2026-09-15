@@ -18,6 +18,7 @@ export type GeminiImageDescriptor = {
   readonly turnId: ProviderTurnId
   readonly proven: boolean
   readonly element: Element
+  readonly fullSizeElement?: Element
 }
 
 export type GeminiScanResult = {
@@ -64,7 +65,9 @@ function isUserTurn(turn: Element): boolean {
 }
 
 function userTurnText(turn: Element): string {
-  const node = turn.querySelector(GEMINI_SELECTORS.userTurnText)
+  const node =
+    turn.querySelector(GEMINI_SELECTORS.userTurnText) ??
+    turn.querySelector(GEMINI_SELECTORS.userTurnTextFallback)
   return node?.textContent ?? ""
 }
 
@@ -72,7 +75,25 @@ function isGeneratedImage(image: Element): boolean {
   const cls = image.getAttribute("class") ?? ""
   if (cls.includes("generated-image")) return true
   const src = image.getAttribute("src") ?? ""
+  const alt = image.getAttribute("alt") ?? ""
+  if (src.startsWith("blob:") && alt.includes("AI generated")) return true
   return src.includes("lh3.googleusercontent.com")
+}
+
+function nearbyDownloadControl(image: Element): Element | null {
+  const parent = image.parentElement
+  const containers = [
+    image.closest("figure"),
+    parent,
+    parent?.parentElement,
+    image.closest("model-response"),
+    image,
+  ]
+  for (const container of containers) {
+    const control = container?.querySelector(GEMINI_SELECTORS.downloadControl)
+    if (control !== undefined && control !== null) return control
+  }
+  return null
 }
 
 function imageDescriptor(
@@ -82,19 +103,25 @@ function imageDescriptor(
   index: number,
 ): GeminiImageDescriptor {
   const src = image.getAttribute("src") ?? ""
+  const downloadControl = nearbyDownloadControl(image)
+  const fullSizeHref = downloadControl?.getAttribute("href") ?? null
+  const sourceUrl = fullSizeHref ?? src
   const candidate: ImageCandidate = {
     id: imageCandidateId(`gemini:${turnId}:${index}`),
     provider: "gemini",
-    sourceUrl: imageUrl(src),
+    sourceUrl: imageUrl(sourceUrl),
     observedAt: now,
     providerTurnId: turnId,
   }
-  const container = image.closest("figure") ?? image.parentElement ?? image
-  const hasDownloadControl =
-    container.querySelector(GEMINI_SELECTORS.downloadControl) !== null ||
-    image.parentElement?.querySelector(GEMINI_SELECTORS.downloadControl) !== null
-  const proven = hasDownloadControl && src !== ""
-  return { candidate, turnId, proven, element: image }
+  const proven = downloadControl !== null && src !== ""
+  const descriptor = {
+    candidate,
+    turnId,
+    proven,
+    element: image,
+  }
+  if (downloadControl === null || fullSizeHref !== null) return descriptor
+  return { ...descriptor, fullSizeElement: downloadControl }
 }
 
 export function captureProvisionalPrompt(document_like: Document): PromptCapture | undefined {

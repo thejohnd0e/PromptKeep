@@ -156,6 +156,10 @@ export class MockElement {
     return true
   }
 
+  click(): void {
+    this.dispatchEvent({ type: "click" })
+  }
+
   focus(): void {
     ;(document as unknown as MockDocument).activeElement = this
   }
@@ -205,19 +209,32 @@ function matchesSelector(element: MockElement, selector: string): boolean {
 
 export class MockDocument {
   readonly body = new MockElement("body")
+  readonly documentElement = new MockElement("html")
   activeElement: MockElement | null = null
+  readonly defaultView = {
+    setTimeout: (handler: () => void, timeout: number) => setTimeout(handler, timeout),
+    clearTimeout: (timeoutId: ReturnType<typeof setTimeout>) => clearTimeout(timeoutId),
+  }
 
   createElement(tagName: string): MockElement {
     return new MockElement(tagName)
   }
 }
 
+class MockMutationObserver {
+  observe(): void {}
+
+  disconnect(): void {}
+}
+
 export function installDomShim(): MockDocument {
   const doc = new MockDocument()
+  doc.documentElement.appendChild(doc.body)
   vi.stubGlobal("document", doc)
   vi.stubGlobal("Element", MockElement)
   vi.stubGlobal("HTMLElement", MockElement)
   vi.stubGlobal("HTMLImageElement", MockElement)
   vi.stubGlobal("HTMLButtonElement", MockElement)
+  vi.stubGlobal("MutationObserver", MockMutationObserver)
   return doc
 }

@@ -62,7 +62,30 @@ describe("asset fetcher", () => {
     }
   })
 
-  it("denies any redirect without following it", async () => {
+  it("includes browser credentials for authenticated provider assets", async () => {
+    const { baseUrl } = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "image/png" })
+      res.end(Buffer.from(pngBytes))
+    })
+    let observedCredentials: RequestCredentials | undefined
+    const fetcher = createAssetFetcher({
+      policy: testPolicy,
+      fetchImpl: async (url, init) => {
+        observedCredentials = init?.credentials
+        return fetch(url, init)
+      },
+      maxBytes: 1024,
+      timeoutMilliseconds: 1_000,
+      retryCount: 0,
+    })
+
+    const result = await fetcher(imageUrl(`${baseUrl}/asset.png`))
+
+    expect(result.kind).toBe("ok")
+    expect(observedCredentials).toBe("include")
+  })
+
+  it("follows an allowlisted redirect before reading image bytes", async () => {
     const { baseUrl, requests } = await startServer((req, res) => {
       if (req.url === "/start") {
         res.writeHead(302, { location: "/secret" })
@@ -80,8 +103,46 @@ describe("asset fetcher", () => {
       retryCount: 0,
     })
     const result = await fetcher(imageUrl(`${baseUrl}/start`))
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok") {
+      expect(result.bytes).toEqual(pngBytes)
+    }
+    expect(requests).toEqual(["/start", "/secret"])
+  })
+
+  it("denies a redirect without a location", async () => {
+    const { baseUrl } = await startServer((_req, res) => {
+      res.writeHead(302)
+      res.end()
+    })
+    const fetcher = createAssetFetcher({
+      policy: testPolicy,
+      fetchImpl: fetch,
+      maxBytes: 1024,
+      timeoutMilliseconds: 1_000,
+      retryCount: 0,
+    })
+    const result = await fetcher(imageUrl(`${baseUrl}/start`))
     expect(result).toEqual({ kind: "rejected", error: { code: "ASSET_REDIRECT_DENIED" } })
-    expect(requests).toEqual(["/start"])
+  })
+
+  it("denies a redirect to a host outside the asset policy", async () => {
+    const { baseUrl } = await startServer((_req, res) => {
+      res.writeHead(302, { location: "https://evil.example.com/asset.png" })
+      res.end()
+    })
+    const fetcher = createAssetFetcher({
+      policy: testPolicy,
+      fetchImpl: fetch,
+      maxBytes: 1024,
+      timeoutMilliseconds: 1_000,
+      retryCount: 0,
+    })
+    const result = await fetcher(imageUrl(`${baseUrl}/start`))
+    expect(result).toEqual({
+      kind: "rejected",
+      error: { code: "ASSET_HOST_NOT_ALLOWED", hostname: "evil.example.com" },
+    })
   })
 
   it("rejects a non-ok status", async () => {
@@ -100,7 +161,7 @@ describe("asset fetcher", () => {
     expect(result).toEqual({ kind: "rejected", error: { code: "ASSET_BAD_STATUS", status: 401 } })
   })
 
-  it("rejects a non-png content type", async () => {
+  it("rejects a non-image content type", async () => {
     const { baseUrl } = await startServer((_req, res) => {
       res.writeHead(200, { "content-type": "text/html" })
       res.end("<html>not an image</html>")
@@ -135,10 +196,10 @@ describe("asset fetcher", () => {
     expect(result.kind).toBe("ok")
   })
 
-  it("rejects bytes that are not a PNG despite an image/png content type", async () => {
+  it("accepts supported raster bytes for offscreen PNG conversion", async () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
     const { baseUrl } = await startServer((_req, res) => {
-      res.writeHead(200, { "content-type": "image/png" })
+      res.writeHead(200, { "content-type": "image/jpeg" })
       res.end(Buffer.from(jpeg))
     })
     const fetcher = createAssetFetcher({
@@ -149,10 +210,8 @@ describe("asset fetcher", () => {
       retryCount: 0,
     })
     const result = await fetcher(imageUrl(`${baseUrl}/fake.png`))
-    expect(result).toEqual({
-      kind: "rejected",
-      error: { code: "ASSET_NOT_PNG", mediaType: "image/jpeg" },
-    })
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok") expect(result.bytes).toEqual(jpeg)
   })
 
   it("rejects a body whose content-length exceeds the cap before reading", async () => {
@@ -382,7 +441,10 @@ describe("downloader", () => {
       waitForDownload: async () => ({ kind: "interrupted", error: "NETWORK_FAILED" }),
     })
     const result = await downloader("blob:test", "corgi")
-    expect(result).toEqual({ kind: "rejected", error: { code: "DOWNLOAD_FAILED" } })
+    expect(result).toEqual({
+      kind: "rejected",
+      error: { code: "DOWNLOAD_FAILED", reason: "NETWORK_FAILED" },
+    })
   })
 
   it("reports DOWNLOAD_FAILED when the download API rejects", async () => {

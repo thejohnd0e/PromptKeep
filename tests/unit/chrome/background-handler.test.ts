@@ -150,6 +150,19 @@ describe("background initiate handler", () => {
     })
   })
 
+  it("uses content-provided image bytes without fetching the source URL", async () => {
+    const { deps, calls } = createDeps()
+    const message = { ...validInitiateMessage(), imageBytes: [...buildValidPng()] }
+    const result = await handleInitiateOperation(message, deps)
+    expect(result).toEqual({
+      version: MESSAGE_VERSION,
+      type: "operation_accepted",
+      nonce: message.nonce,
+    })
+    expect(calls.fetched).toEqual([])
+    expect(calls.saved).toEqual([message.nonce])
+  })
+
   it("rejects a replayed nonce without fetching again", async () => {
     const { deps, calls } = createDeps()
     const message = validInitiateMessage()
@@ -175,7 +188,7 @@ describe("background initiate handler", () => {
       version: MESSAGE_VERSION,
       type: "operation_rejected",
       nonce: message.nonce,
-      error: { code: "download_failed" },
+      error: { code: "download_failed", reason: "ASSET_REDIRECT_DENIED" },
     })
     expect(calls.sent).toHaveLength(0)
     expect(await jobStore.get(message.nonce)).toEqual({

@@ -41,6 +41,10 @@ async function main() {
     await cp(resolve(ROOT, "src/chrome/icons"), resolve(ROOT, "dist/chrome/icons"), {
       recursive: true,
     })
+    await copyFile(
+      resolve(ROOT, "src/providers/gemini/page-download-capture.js"),
+      resolve(ROOT, "dist/chrome/page-download-capture.js"),
+    )
     // The offscreen document is referenced as "offscreen.html" by the manifest
     // and OFFSCREEN_DOCUMENT_PATH; Vite emits only the bundled script, so the
     // HTML shell is written here with the script path rewritten to the bundle.

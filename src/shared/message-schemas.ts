@@ -27,6 +27,14 @@ const sourceUrlSchema = z
   .max(2048)
   .refine((value) => value.startsWith("https://"), { message: "sourceUrl must be https" })
 
+const imageSourceUrlSchema = z
+  .string()
+  .max(2048)
+  .refine(
+    (value) => value.startsWith("https://") || value.startsWith("blob:https://gemini.google.com/"),
+    { message: "image sourceUrl must be https or a Gemini blob URL" },
+  )
+
 const promptCaptureSchema = z
   .strictObject({
     id: stringId.transform(promptCaptureId),
@@ -64,7 +72,7 @@ const imageCandidateSchema = z
   .strictObject({
     id: stringId.transform(imageCandidateId),
     provider: providerSchema,
-    sourceUrl: z.url({ protocol: /^https$/ }).transform(imageUrl),
+    sourceUrl: imageSourceUrlSchema.transform(imageUrl),
     observedAt: timestampSchema,
     providerTurnId: stringId.transform(providerTurnId).exactOptional(),
     expectedSha256: stringId.transform(sha256Digest).exactOptional(),
@@ -72,6 +80,7 @@ const imageCandidateSchema = z
   .refine(
     (value) => {
       try {
+        if (value.sourceUrl.startsWith("blob:")) return true
         return !isForbiddenUrlHost(new URL(value.sourceUrl).hostname)
       } catch {
         return false
@@ -114,6 +123,7 @@ const enrichmentErrorSchema = z.discriminatedUnion("code", [
   z.strictObject({
     code: z.literal("download_failed"),
     status: byteCountSchema.exactOptional(),
+    reason: z.string().exactOptional(),
   }),
   z.strictObject({
     code: z.literal("input_too_large"),
@@ -154,6 +164,7 @@ const initiateOperationSchema = z.strictObject({
   createdAt: timestampSchema,
   promptCapture: promptCaptureSchema,
   imageCandidate: imageCandidateSchema,
+  imageBytes: z.array(z.number().int().min(0).max(255)).max(LIMITS.maxInputBytes).exactOptional(),
 })
 
 const operationAcceptedSchema = z.strictObject({

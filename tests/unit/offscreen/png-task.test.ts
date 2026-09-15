@@ -59,10 +59,26 @@ describe("png task", () => {
     if (result.kind === "ok") URL.revokeObjectURL(result.message.blobUrl)
   })
 
-  it("rejects non-PNG bytes as unsupported_media_type", async () => {
+  it("converts non-PNG raster bytes before enrichment", async () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])
     const loadAsset = async () => jpeg
-    const result = await runPngTask(request(), { loadAsset })
+    const result = await runPngTask(request(), {
+      loadAsset,
+      rasterToPng: async (input) => (input === jpeg ? buildValidPng() : input),
+    })
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok") URL.revokeObjectURL(result.message.blobUrl)
+  })
+
+  it("rejects raster bytes when PNG conversion fails", async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])
+    const loadAsset = async () => jpeg
+    const result = await runPngTask(request(), {
+      loadAsset,
+      rasterToPng: async () => {
+        throw new Error("decode failed")
+      },
+    })
     expect(result.kind).toBe("rejected")
     if (result.kind === "rejected") {
       expect(result.message.error).toEqual({

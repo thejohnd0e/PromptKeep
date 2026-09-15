@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Prompt Image Metadata",
-  "version": "1.12",
+  "version": "1.18",
   "description": "Local-only bootstrap build for prompt-associated image metadata.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -34,6 +34,12 @@
     "https://gemini.google.com/*",
     "https://grok.com/*",
     "https://*.googleusercontent.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page-download-capture.js"],
+      "matches": ["https://gemini.google.com/*"]
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

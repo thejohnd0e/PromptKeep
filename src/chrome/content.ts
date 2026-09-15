@@ -1,4 +1,6 @@
-import { adapterFor, startController } from "../content/controller"
+import contentStyles from "../content/content-ui.css?inline"
+import { startController } from "../content/controller"
+import { providerAdapters } from "../providers/registry"
 import {
   type ImageCandidate,
   type OperationNonce,
@@ -63,6 +65,15 @@ export async function sendInitiateOperation(
   return asContentResponse(parsed.message)
 }
 
+function ensureContentStyles(): void {
+  const styleId = "aip2e-content-styles"
+  if (document.getElementById(styleId) !== null) return
+  const style = document.createElement("style")
+  style.id = styleId
+  style.textContent = contentStyles
+  document.documentElement.appendChild(style)
+}
+
 // Minimal listener skeleton. Status UI wiring arrives in task 7; provider
 // adapters arrive in tasks 10-12. The content script only sends
 // initiate_operation requests and awaits their responses directly.
@@ -92,13 +103,15 @@ function providerForHost(hostname: string): Provider | undefined {
 if (typeof chrome !== "undefined" && chrome.runtime?.id !== undefined) {
   const provider = providerForHost(location.hostname)
   if (provider !== undefined) {
+    ensureContentStyles()
     startController({
       document_like: document,
       provider,
-      scan: adapterFor(provider),
+      ...providerAdapters[provider],
       sendInitiate: sendInitiateOperation,
       now: () => unixMilliseconds(Date.now()),
       pageUrl: () => location.href,
+      extensionVersion: chrome.runtime.getManifest().version,
     })
   }
 }

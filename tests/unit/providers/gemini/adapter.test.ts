@@ -19,7 +19,7 @@ function fixture(name: string) {
 
 describe("gemini adapter", () => {
   it("pins the selectors version", () => {
-    expect(GEMINI_SELECTORS_VERSION).toBe(1)
+    expect(GEMINI_SELECTORS_VERSION).toBe(2)
   })
 
   it("full-size: reconciles prompt and classifies one proven image", () => {
@@ -30,6 +30,34 @@ describe("gemini adapter", () => {
     expect(result.promptCapture.providerTurnId).toBe("gemini:2")
     expect(result.association).toBe("provider_identity")
     expect(result.images.length).toBe(1)
+  })
+
+  it("full-size: stores the visible prompt once without the screen-reader label", () => {
+    const result = captureGeminiTurn(fixture("full-size"), PROMPT, NOW, CAPTURE_ID)
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    expect(result.promptCapture.originalPrompt).toBe(PROMPT)
+  })
+
+  it("full-size-separate-asset: uses the full-size download URL instead of the thumbnail", () => {
+    const result = captureGeminiTurn(fixture("full-size-separate-asset"), PROMPT, NOW, CAPTURE_ID)
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    expect(result.images[0]?.candidate.sourceUrl).toBe(
+      "https://lh3.googleusercontent.com/lighthouse-original.png",
+    )
+    expect(result.association).toBe("provider_identity")
+  })
+
+  it("blob-image: classifies Gemini blob-rendered generated images", () => {
+    const result = captureGeminiTurn(fixture("blob-image"), PROMPT, NOW, CAPTURE_ID)
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+    expect(result.images[0]?.candidate.sourceUrl).toBe("blob:https://gemini.google.com/blob-asset")
+    expect(result.images[0]?.fullSizeElement?.getAttribute("aria-label")).toBe(
+      "Download full size image",
+    )
+    expect(result.association).toBe("provider_identity")
   })
 
   it("historical: matches the prompt in an earlier visible turn", () => {

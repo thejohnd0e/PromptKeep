@@ -27,6 +27,7 @@ export type InitiateOperationMessage = {
   readonly createdAt: UnixMilliseconds
   readonly promptCapture: PromptCapture
   readonly imageCandidate: ImageCandidate
+  readonly imageBytes?: readonly number[]
 }
 
 export type OperationAcceptedMessage = {

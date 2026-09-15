@@ -4,7 +4,7 @@
  * Gemini renders model turns with generated-image containers; every selector
  * is versioned so fixtures and tests pin the exact DOM shape they cover.
  */
-export const GEMINI_SELECTORS_VERSION = 1
+export const GEMINI_SELECTORS_VERSION = 2
 
 export const GEMINI_SELECTORS = {
   /** A single conversation turn container. */
@@ -13,10 +13,10 @@ export const GEMINI_SELECTORS = {
   modelTurn: "model-response",
   /** User turn container. */
   userTurn: "user-query",
-  /** Rendered user prompt text inside a user turn. */
-  userTurnText: ".query-text",
+  userTurnText: ".query-text-line",
+  userTurnTextFallback: ".query-text",
   /** Generated image inside a model turn. */
-  generatedImage: "img.generated-image, img[src*='lh3.googleusercontent.com']",
+  generatedImage: "img.generated-image, img[src*='lh3.googleusercontent.com'], img[src^='blob:']",
   /** Provider-visible full-size download control. */
   downloadControl: "a[aria-label*='Download'], button[aria-label*='Download'], a[download]",
   /** Composer for provisional prompt capture. */

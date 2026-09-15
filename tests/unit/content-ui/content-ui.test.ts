@@ -103,6 +103,20 @@ describe("mountDownloadControl", () => {
     expect(control.style.right).toBe("8px")
   })
 
+  it("places the Gemini control lower on the right to avoid native image actions", () => {
+    const config = mountConfig({ provider: "gemini" })
+    config.container.appendChild(config.imageElement)
+    mountToBody(config.container)
+
+    mountDownloadControl(config)
+
+    const control = controlOf(config.container)
+    expect(control).not.toBeNull()
+    if (control === null) return
+    expect(control.style.top).toBe("44px")
+    expect(control.style.right).toBe("8px")
+  })
+
   it("hides the control until the image is hovered", () => {
     const config = mountConfig()
     config.container.appendChild(config.imageElement)

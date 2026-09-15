@@ -115,7 +115,7 @@ function mapAssetError(error: AssetFetchError): EnrichmentError {
     case "ASSET_PATH_NOT_ALLOWED":
     case "ASSET_REDIRECT_DENIED":
     case "ASSET_FETCH_FAILED":
-      return { code: "download_failed" }
+      return { code: "download_failed", reason: error.code }
     case "ASSET_BAD_STATUS":
       return { code: "download_failed", status: error.status }
     case "ASSET_TIMEOUT":
@@ -158,11 +158,15 @@ export async function handleInitiateOperation(
   }
   try {
     await deps.ensureOffscreenDocument()
-    const fetched = await deps.fetchAsset(message.imageCandidate.sourceUrl)
-    if (fetched.kind === "rejected") {
-      return rejectJob(deps, message.nonce, mapAssetError(fetched.error))
+    if (message.imageBytes === undefined) {
+      const fetched = await deps.fetchAsset(message.imageCandidate.sourceUrl)
+      if (fetched.kind === "rejected") {
+        return rejectJob(deps, message.nonce, mapAssetError(fetched.error))
+      }
+      await deps.assetTransfer.save(message.nonce, fetched.bytes)
+    } else {
+      await deps.assetTransfer.save(message.nonce, new Uint8Array(message.imageBytes))
     }
-    await deps.assetTransfer.save(message.nonce, fetched.bytes)
     const job: OffscreenJobMessage = {
       version: MESSAGE_VERSION,
       type: "offscreen_job",
@@ -210,7 +214,10 @@ export async function handleInitiateOperation(
         message.nonce,
         download.error.code === "DOWNLOAD_CANCELLED"
           ? { code: "operation_cancelled" }
-          : { code: "download_failed" },
+          : {
+              code: "download_failed",
+              ...(download.error.reason === undefined ? {} : { reason: download.error.reason }),
+            },
       )
     }
     await deps.jobStore.complete(message.nonce)

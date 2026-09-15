@@ -137,7 +137,7 @@ export type EnrichmentError =
   | { readonly code: "association_ambiguous"; readonly candidateCount: number }
   | { readonly code: "confirmation_required"; readonly candidateCount: number }
   | { readonly code: "unsupported_media_type"; readonly mediaType: string }
-  | { readonly code: "download_failed"; readonly status?: number }
+  | { readonly code: "download_failed"; readonly status?: number; readonly reason?: string }
   | { readonly code: "input_too_large"; readonly actualBytes: number; readonly limitBytes: number }
   | { readonly code: "invalid_png"; readonly reason: string }
   | { readonly code: "unsupported_png"; readonly feature: string }

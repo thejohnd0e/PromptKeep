@@ -77,6 +77,25 @@ describe("message schema validation", () => {
     }
   })
 
+  it("accepts a Gemini blob image candidate with content-provided bytes", () => {
+    const message = validInitiateMessage()
+    const withBlobBytes = {
+      ...message,
+      imageCandidate: {
+        ...message.imageCandidate,
+        sourceUrl: "blob:https://gemini.google.com/blob-asset",
+      },
+      imageBytes: [137, 80, 78, 71],
+    }
+
+    const result = parseInboundMessage(withBlobBytes, NOW)
+
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok" && result.message.type === "initiate_operation") {
+      expect(result.message.imageBytes).toEqual([137, 80, 78, 71])
+    }
+  })
+
   it("rejects an initiate message with a non-https source URL", () => {
     const message = validInitiateMessage()
     const withUrl = {
