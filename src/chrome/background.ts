@@ -53,6 +53,19 @@ function providerSystemLabel(provider: Provider): string {
   }
 }
 
+function providerFilenameBase(provider: Provider, nonce: OperationNonce): string {
+  switch (provider) {
+    case "chatgpt":
+      return `ChatGPT-${nonce}`
+    case "gemini":
+      return `Gemini-${nonce}`
+    case "grok":
+      return nonce
+    default:
+      return assertNever(provider)
+  }
+}
+
 export type BackgroundDeps = {
   readonly nonceRegistry: NonceRegistry
   readonly jobStore: JobStore
@@ -200,7 +213,10 @@ export async function handleInitiateOperation(
     // The offscreen document can only use chrome.runtime, so it hands back a
     // Blob URL and the service worker (which owns chrome.downloads) triggers
     // and awaits the actual download.
-    const download = await deps.downloadBlobUrl(parsedAck.message.blobUrl, message.nonce)
+    const download = await deps.downloadBlobUrl(
+      parsedAck.message.blobUrl,
+      providerFilenameBase(message.promptCapture.provider, message.nonce),
+    )
     const revoke: OffscreenRevokeMessage = {
       version: MESSAGE_VERSION,
       type: "offscreen_revoke",

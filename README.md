@@ -13,8 +13,10 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
 
 1. Detects generated images on supported provider pages and overlays a round white **A**
    button (visible on hover, top-right corner of the image).
-2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it as
-   `<original-name>-ai-prompt.png`.
+2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it with
+   a provider-prefixed unique name (e.g. `ChatGPT-<unique-id>-ai-prompt.png` for ChatGPT,
+   `Gemini-<unique-id>-ai-prompt.png` for Gemini). Grok downloads use the existing
+   `<unique-id>-ai-prompt.png` format.
 3. Leaves the pixels untouched and copies every unrelated PNG chunk byte-for-byte,
    including the original CRCs and any `caBX` (C2PA) payload.
 
