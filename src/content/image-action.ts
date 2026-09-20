@@ -54,7 +54,7 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   control.className = "aip2e-control"
   control.style.position = "absolute"
   control.style.zIndex = "2147483647"
-  if (config.provider === "gemini") {
+  if (config.provider === "gemini" || config.provider === "chatgpt") {
     control.style.top = "44px"
     control.style.right = "8px"
   } else {
