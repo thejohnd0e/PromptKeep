@@ -1,5 +1,6 @@
 import type { Provider } from "../shared/contracts"
 import type { AssociationType } from "./confirmation-dialog"
+import buttonImageUrl from "./button-new.png?inline"
 
 export type DownloadRequest = {
   readonly prompt: string
@@ -54,7 +55,10 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   control.className = "aip2e-control"
   control.style.position = "absolute"
   control.style.zIndex = "2147483647"
-  if (config.provider === "gemini" || config.provider === "chatgpt") {
+  if (config.provider === "chatgpt") {
+    control.style.top = "56px"
+    control.style.right = "8px"
+  } else if (config.provider === "gemini") {
     control.style.top = "44px"
     control.style.right = "8px"
   } else {
@@ -68,24 +72,22 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   const button = document.createElement("button")
   button.type = "button"
   button.className = "aip2e-download-button"
-  button.textContent = "A"
   button.setAttribute("aria-label", config.label)
   button.title = config.label
   button.tabIndex = 0
   button.style.display = "inline-flex"
   button.style.alignItems = "center"
   button.style.justifyContent = "center"
-  button.style.width = "42px"
-  button.style.height = "42px"
+  button.style.width = "63px"
+  button.style.height = "63px"
   button.style.boxSizing = "border-box"
   button.style.padding = "0"
-  button.style.fontSize = "16px"
-  button.style.fontWeight = "700"
-  button.style.lineHeight = "1"
-  button.style.fontFamily = "inherit"
-  button.style.color = "#000000"
-  button.style.backgroundColor = "#ffffff"
-  button.style.border = "2px solid #000000"
+  button.style.backgroundImage = `url("${buttonImageUrl}")`
+  button.style.backgroundPosition = "center"
+  button.style.backgroundRepeat = "no-repeat"
+  button.style.backgroundSize = "cover"
+  button.style.backgroundColor = "transparent"
+  button.style.border = "0"
   button.style.borderRadius = "50%"
   button.style.cursor = "pointer"
   button.style.whiteSpace = "nowrap"
