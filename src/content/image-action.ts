@@ -1,5 +1,6 @@
 import type { Provider } from "../shared/contracts"
 import type { AssociationType } from "./confirmation-dialog"
+import type { ProviderAction } from "../providers/types"
 import buttonImageUrl from "./button-new.png?inline"
 
 export type DownloadRequest = {
@@ -17,6 +18,8 @@ export type DownloadControlConfig = {
   readonly prompt: string
   readonly associationType: AssociationType
   readonly onRequest: (request: DownloadRequest) => void
+  readonly actions?: readonly ProviderAction[]
+  readonly onAction?: (action: ProviderAction) => Promise<void>
 }
 
 export type DownloadControlHandle = {
@@ -92,8 +95,22 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   button.style.cursor = "pointer"
   button.style.whiteSpace = "nowrap"
 
+  const actionButtons: HTMLButtonElement[] = []
+  for (const action of config.actions ?? []) {
+    const actionButton = document.createElement("button")
+    actionButton.type = "button"
+    actionButton.className = "aip2e-action-button"
+    actionButton.setAttribute("data-action-kind", action.kind)
+    actionButton.setAttribute("aria-label", action.label)
+    actionButton.title = action.label
+    actionButton.textContent = action.kind === "personalize" ? "✦" : action.kind === "edit_and_resend" ? "✎" : "↻"
+    actionButton.tabIndex = 0
+    actionButtons.push(actionButton)
+  }
+
   let prompt = config.prompt
   let ready = true
+  let actionBusy = false
 
   const requestDownload = (): void => {
     if (!ready) {
@@ -115,6 +132,17 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   const activate = (): void => {
     spinButton(button)
     requestDownload()
+  }
+
+  const activateAction = (action: ProviderAction, actionButton: HTMLButtonElement): void => {
+    if (!ready || actionBusy || config.onAction === undefined) return
+    actionBusy = true
+    actionButton.disabled = true
+    spinButton(actionButton)
+    void config.onAction(action).finally(() => {
+      actionBusy = false
+      if (ready) actionButton.disabled = false
+    })
   }
 
   const handleClick = (event: MouseEvent): void => {
@@ -146,10 +174,34 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
   button.addEventListener("focus", showControl)
   button.addEventListener("blur", hideControl)
 
+  const actionListeners = (config.actions ?? []).map((action, index) => {
+    const actionButton = actionButtons[index]
+    if (actionButton === undefined) return undefined
+    const handleActionClick = (event: MouseEvent): void => {
+      consumeInteraction(event)
+      activateAction(action, actionButton)
+    }
+    const handleActionKeydown = (event: KeyboardEvent): void => {
+      if (event.key === "Enter" || event.key === " ") {
+        consumeInteraction(event)
+        activateAction(action, actionButton)
+      }
+    }
+    actionButton.addEventListener("pointerdown", consumeInteraction)
+    actionButton.addEventListener("mousedown", consumeInteraction)
+    actionButton.addEventListener("click", handleActionClick)
+    actionButton.addEventListener("keydown", handleActionKeydown)
+    return { actionButton, handleActionClick, handleActionKeydown }
+  })
+
   config.container.addEventListener("mouseenter", showControl)
   config.container.addEventListener("mouseleave", hideControl)
 
-  control.appendChild(button)
+  const buttonGroup = document.createElement("div")
+  buttonGroup.className = "aip2e-button-group"
+  buttonGroup.appendChild(button)
+  for (const actionButton of actionButtons) buttonGroup.appendChild(actionButton)
+  control.appendChild(buttonGroup)
   config.container.appendChild(control)
 
   const handle: DownloadControlHandle = {
@@ -161,6 +213,13 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
       button.removeEventListener("keydown", handleKeydown)
       button.removeEventListener("focus", showControl)
       button.removeEventListener("blur", hideControl)
+      for (const listener of actionListeners) {
+        if (listener === undefined) continue
+        listener.actionButton.removeEventListener("pointerdown", consumeInteraction)
+        listener.actionButton.removeEventListener("mousedown", consumeInteraction)
+        listener.actionButton.removeEventListener("click", listener.handleActionClick)
+        listener.actionButton.removeEventListener("keydown", listener.handleActionKeydown)
+      }
       config.container.removeEventListener("mouseenter", showControl)
       config.container.removeEventListener("mouseleave", hideControl)
       control.remove()
@@ -171,6 +230,7 @@ export function mountDownloadControl(config: DownloadControlConfig): DownloadCon
     setReady: (nextReady) => {
       ready = nextReady
       button.disabled = !nextReady
+      for (const actionButton of actionButtons) actionButton.disabled = !nextReady || actionBusy
     },
   }
 

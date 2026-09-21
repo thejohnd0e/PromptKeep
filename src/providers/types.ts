@@ -7,11 +7,18 @@ export type ProviderImage = {
   readonly fullSizeElement?: Element
 }
 
+export type ProviderAction = {
+  readonly kind: "regenerate" | "personalize" | "edit_and_resend"
+  readonly label: string
+  readonly run: () => Promise<void>
+}
+
 export type ScanResult = {
   readonly prompt: string
   readonly turnId: string
   readonly association: "provider_identity" | "confirmation_required"
   readonly images: readonly ProviderImage[]
+  readonly actions?: readonly ProviderAction[]
 }
 
 export type ProviderAdapter = {

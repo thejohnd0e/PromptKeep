@@ -25,6 +25,8 @@ export const CHATGPT_SELECTORS = {
   downloadControl: "a[aria-label*='Download'], button[aria-label*='Download']",
   /** Composer textarea for provisional prompt capture. */
   composer: "#prompt-textarea",
+  editMessage: "button[aria-label='Edit message']",
+  editComposer: "textarea[aria-label='Edit message']",
 } as const
 
 export type ChatGptSelectorKey = keyof typeof CHATGPT_SELECTORS

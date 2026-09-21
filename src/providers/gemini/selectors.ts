@@ -19,6 +19,8 @@ export const GEMINI_SELECTORS = {
   generatedImage: "img.generated-image, img[src*='lh3.googleusercontent.com'], img[src^='blob:']",
   /** Provider-visible full-size download control. */
   downloadControl: "a[aria-label*='Download'], button[aria-label*='Download'], a[download]",
+  regenerateTrigger: "gem-icon-button[data-test-id='regenerate-button']",
+  regenerateOption: "gem-menu-item[data-test-id='regenerate-option']",
   /** Composer for provisional prompt capture. */
   composer: ".ql-editor[contenteditable='true'], rich-textarea .ql-editor",
   /** Images/Library unsupported state marker. */

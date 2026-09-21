@@ -1,4 +1,4 @@
-import type { ProviderAdapter, ProviderImage } from "../providers/types"
+import type { ProviderAction, ProviderAdapter, ProviderImage } from "../providers/types"
 import type { PromptCapture, Provider, UnixMilliseconds } from "../shared/contracts"
 import { promptCaptureId } from "../shared/contracts"
 import type { ContentResponse, InitiateOperationMessage } from "../shared/messages"
@@ -137,6 +137,20 @@ export function startController(deps: ControllerDeps): ControllerHandle {
     }
   }
 
+  const handleAction = async (action: ProviderAction): Promise<void> => {
+    showStatus("success", "ACTION_STARTED", `${action.label} is starting.`)
+    try {
+      await action.run()
+      clearStatus()
+    } catch (error) {
+      showStatus(
+        "error",
+        "action_failed",
+        error instanceof Error ? error.message : `${action.label} could not be completed.`,
+      )
+    }
+  }
+
   const mountAll = (): void => {
     for (const entry of deps.scan(deps.document_like, deps.now())) {
       for (const image of entry.images) {
@@ -148,8 +162,9 @@ export function startController(deps: ControllerDeps): ControllerHandle {
           label: "Download with prompt",
           provider: deps.provider,
           prompt: entry.prompt,
-          associationType: associationType(entry.association),
-          onRequest: () => {
+           associationType: associationType(entry.association),
+           ...(entry.actions === undefined ? {} : { actions: entry.actions, onAction: handleAction }),
+           onRequest: () => {
             void handleRequest(entry.prompt, entry.turnId, image)
           },
         })

@@ -13,6 +13,8 @@ import {
   unixMilliseconds,
 } from "../../shared/contracts"
 import { CHATGPT_SELECTORS } from "./selectors"
+import { chatGptEditAndResend } from "./actions"
+import type { ProviderAction } from "../types"
 
 export type ChatGptTurn = {
   readonly turnId: ProviderTurnId
@@ -32,6 +34,7 @@ export type ChatGptScanResult = {
   readonly turnId: ProviderTurnId
   readonly images: readonly ChatGptImageDescriptor[]
   readonly association: "provider_identity" | "confirmation_required"
+  readonly actions: readonly ProviderAction[]
 }
 
 export type ChatGptCaptureResult =
@@ -250,6 +253,7 @@ export function scanChatGptTurns(
       turnId: classified.assistantTurnId,
       images: classified.images,
       association: classified.association,
+      actions: [chatGptEditAndResend(turn)],
     })
   }
   return results

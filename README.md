@@ -19,6 +19,15 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
    `<unique-id>-ai-prompt.png` format.
 3. Leaves the pixels untouched and copies every unrelated PNG chunk byte-for-byte,
    including the original CRCs and any `caBX` (C2PA) payload.
+4. Adds quick actions below the download button for generated images:
+   - **Google Gemini** — `Try again` and `Personalize`, delegated to Gemini's native
+     controls for the matching response.
+   - **ChatGPT** — `Edit and resend`, which opens the matching user message editor and
+     submits the unchanged prompt through ChatGPT's native `Send` control.
+
+The quick actions are scoped to the specific response containing the image. They fail
+closed when the provider's current DOM does not expose an unambiguous native control;
+the extension never calls private provider APIs for these actions.
 
 ## Metadata written
 
@@ -86,6 +95,9 @@ Three isolated layers keep volatile provider integrations away from the byte-lev
 - **Fixtures, not live provider contracts.** ChatGPT, Gemini, and Grok change their DOM
   without notice. When a layout changes, the affected adapter fails closed and no file is
   produced until its versioned selectors are refreshed.
+- **Quick actions depend on provider UI.** Regeneration, personalization, and edit/resend
+  are performed by clicking the provider's visible native controls. A provider layout or
+  localization change can temporarily disable an action until its selectors are refreshed.
 - **`parameters` is `iTXt`.** Tooling that scans only `tEXt`/`zTXt` will not see it. This
   is a deliberate trade-off in favour of correct non-Latin-1 prompts; XMP remains the
   standards-compliant channel.

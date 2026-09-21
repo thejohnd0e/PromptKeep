@@ -12,6 +12,8 @@ import {
   unixMilliseconds,
 } from "../../shared/contracts"
 import { GEMINI_SELECTORS } from "./selectors"
+import { geminiActions } from "./actions"
+import type { ProviderAction } from "../types"
 
 export type GeminiImageDescriptor = {
   readonly candidate: ImageCandidate
@@ -26,6 +28,7 @@ export type GeminiScanResult = {
   readonly turnId: ProviderTurnId
   readonly images: readonly GeminiImageDescriptor[]
   readonly association: "provider_identity" | "confirmation_required"
+  readonly actions: readonly ProviderAction[]
 }
 
 export type GeminiCaptureResult =
@@ -160,6 +163,7 @@ export function classifyModelImages(
 ): {
   images: readonly GeminiImageDescriptor[]
   modelTurnId: ProviderTurnId | undefined
+  model: Element | undefined
   association: "provider_identity" | "confirmation_required"
   candidateCount: number
   unsupportedState: boolean
@@ -170,6 +174,7 @@ export function classifyModelImages(
     return {
       images: [],
       modelTurnId: undefined,
+      model: undefined,
       association: "confirmation_required",
       candidateCount: 0,
       unsupportedState: false,
@@ -183,6 +188,7 @@ export function classifyModelImages(
   return {
     images: descriptors,
     modelTurnId: turnId,
+    model,
     association: allProven ? "provider_identity" : "confirmation_required",
     candidateCount: descriptors.length,
     unsupportedState: unsupported,
@@ -244,12 +250,18 @@ export function scanGeminiTurns(
     const prompt = normalizePromptText(userTurnText(turn))
     if (prompt === "") continue
     const classified = classifyModelImages(document_like, index, now)
-    if (classified.images.length === 0 || classified.modelTurnId === undefined) continue
+    if (
+      classified.images.length === 0 ||
+      classified.modelTurnId === undefined ||
+      classified.model === undefined
+    )
+      continue
     results.push({
       prompt,
       turnId: classified.modelTurnId,
       images: classified.images,
       association: classified.association,
+      actions: geminiActions(classified.model),
     })
   }
   return results
