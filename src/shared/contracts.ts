@@ -104,6 +104,7 @@ export type PromptCapture = {
   readonly capturedAt: UnixMilliseconds
   readonly providerTurnId?: ProviderTurnId
   readonly sourceUrl?: string
+  readonly model?: string
 }
 
 export type ImageCandidate = {

@@ -23,6 +23,8 @@ export const GEMINI_SELECTORS = {
   regenerateOption: "gem-menu-item[data-test-id='regenerate-option']",
   /** Composer for provisional prompt capture. */
   composer: ".ql-editor[contenteditable='true'], rich-textarea .ql-editor",
+  modeButton: "button[data-test-id='bard-mode-menu-button']",
+  selectedMode: "[data-test-id='gem-mode-menu'] gem-menu-item.selected .label",
   /** Images/Library unsupported state marker. */
   unsupportedState: "[data-test-id='unsupported-state'], .unsupported-state",
 } as const

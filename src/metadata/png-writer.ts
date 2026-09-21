@@ -6,6 +6,7 @@ import { type PngChunkDescriptor, type PngResult, pngRejected } from "./png-type
 const XMP_KEYWORD = "XML:com.adobe.xmp"
 const PARAMETERS_KEYWORD = "parameters"
 const SOURCE_KEYWORD = "Source"
+const MODEL_KEYWORD = "Model"
 const ITXT_TYPE = new TextEncoder().encode("iTXt")
 const TEXT_TYPE = new TextEncoder().encode("tEXt")
 const EXIF_TYPE = new TextEncoder().encode("eXIf")
@@ -15,6 +16,7 @@ export type PngMetadataPayload = {
   readonly exifData?: Uint8Array
   readonly parametersText?: string
   readonly sourceUrl?: string
+  readonly modelText?: string
 }
 
 function buildXmpItxtChunk(xmpData: Uint8Array): Uint8Array {
@@ -132,6 +134,7 @@ export function insertPngMetadata(
     metadata.parametersText !== undefined && metadata.parametersText.length > 0
 
   const writesSource = metadata.sourceUrl !== undefined && metadata.sourceUrl.trim().length > 0
+  const writesModel = metadata.modelText !== undefined && metadata.modelText.trim().length > 0
 
   // `parameters` is written as iTXt (UTF-8) so non-Latin-1 prompts such as
   // Cyrillic survive exactly. A tEXt copy is deliberately not emitted: its
@@ -141,17 +144,20 @@ export function insertPngMetadata(
     buildXmpItxtChunk(metadata.xmpData),
     ...(writesParameters ? [buildItxtChunk(PARAMETERS_KEYWORD, metadata.parametersText)] : []),
     ...(writesSource ? [buildTextChunk(SOURCE_KEYWORD, metadata.sourceUrl.trim())] : []),
+    ...(writesModel ? [buildTextChunk(MODEL_KEYWORD, metadata.modelText.trim())] : []),
   ]
   const insertedBytes = newChunks.reduce((total, chunk) => total + chunk.byteLength, 0)
 
   const parametersIndexes = findTextChunkIndexes(chunks, input, PARAMETERS_KEYWORD)
   const sourceIndexes = findTextChunkIndexes(chunks, input, SOURCE_KEYWORD)
+  const modelIndexes = findTextChunkIndexes(chunks, input, MODEL_KEYWORD)
 
   const replaced = (chunk: PngChunkDescriptor): boolean =>
     chunk.index === xmpChunkIndex ||
     (metadata.exifData !== undefined && chunk.type === "eXIf") ||
     (writesParameters && parametersIndexes.has(chunk.index)) ||
-    (writesSource && sourceIndexes.has(chunk.index))
+    (writesSource && sourceIndexes.has(chunk.index)) ||
+    (writesModel && modelIndexes.has(chunk.index))
 
   let outputLength = PNG_SIGNATURE.byteLength + insertedBytes
   for (const chunk of chunks) {

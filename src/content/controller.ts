@@ -63,6 +63,7 @@ export function startController(deps: ControllerDeps): ControllerHandle {
   const elementByHandle = new Map<DownloadControlHandle, Element>()
   let status: StatusHandle | undefined
   let rescanTimer: number | undefined
+  let initialScan = true
 
   const showStatus = (level: StatusLevel, code: string, message: string): void => {
     status?.dispose()
@@ -83,6 +84,7 @@ export function startController(deps: ControllerDeps): ControllerHandle {
     prompt: string,
     turnId: string,
     image: ProviderImage,
+    model?: string,
   ): Promise<void> => {
     const nonce = operationNonce(crypto.randomUUID().replaceAll("-", ""))
     const sourceUrl = deps.pageUrl()
@@ -95,6 +97,7 @@ export function startController(deps: ControllerDeps): ControllerHandle {
         ? {}
         : { providerTurnId: turnId as NonNullable<PromptCapture["providerTurnId"]> }),
       ...(sourceUrl === "" ? {} : { sourceUrl }),
+      ...(model === undefined ? {} : { model }),
     }
     showStatus("success", "DOWNLOAD_STARTED", "Preparing the image download.")
     let imageBytes: readonly number[] | undefined
@@ -156,16 +159,17 @@ export function startController(deps: ControllerDeps): ControllerHandle {
       for (const image of entry.images) {
         if (mountedElements.has(image.element)) continue
         mountedElements.add(image.element)
+        const model = initialScan ? undefined : entry.model
         const handle = mountDownloadControl({
           container: image.element.parentElement ?? deps.document_like.body,
           imageElement: image.element as HTMLElement,
           label: "Download with prompt",
           provider: deps.provider,
           prompt: entry.prompt,
-           associationType: associationType(entry.association),
-           ...(entry.actions === undefined ? {} : { actions: entry.actions, onAction: handleAction }),
-           onRequest: () => {
-            void handleRequest(entry.prompt, entry.turnId, image)
+          associationType: associationType(entry.association),
+          ...(entry.actions === undefined ? {} : { actions: entry.actions, onAction: handleAction }),
+          onRequest: () => {
+            void handleRequest(entry.prompt, entry.turnId, image, model)
           },
         })
         controls.add(handle)
@@ -194,6 +198,7 @@ export function startController(deps: ControllerDeps): ControllerHandle {
   })
 
   mountAll()
+  initialScan = false
   observer.observe(deps.document_like.body ?? deps.document_like.documentElement, {
     childList: true,
     subtree: true,

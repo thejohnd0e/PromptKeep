@@ -186,9 +186,10 @@ export async function handleInitiateOperation(
       nonce: message.nonce,
       providerSystemLabel: providerSystemLabel(message.promptCapture.provider),
       prompt: message.promptCapture.originalPrompt,
-      ...(message.promptCapture.sourceUrl === undefined
-        ? {}
-        : { sourceUrl: message.promptCapture.sourceUrl }),
+       ...(message.promptCapture.sourceUrl === undefined
+         ? {}
+         : { sourceUrl: message.promptCapture.sourceUrl }),
+       ...(message.promptCapture.model === undefined ? {} : { model: message.promptCapture.model }),
     }
     const marked = await deps.jobStore.markDownloading(message.nonce)
     if (marked.kind === "rejected") {

@@ -17,6 +17,7 @@ export type ReadyAssociation = {
   readonly originalPrompt: string
   readonly observedVersion?: string
   readonly sourceUrl?: string
+  readonly model?: string
 }
 
 export type EnrichPngOptions = { readonly acknowledgeCaBX?: boolean }
@@ -218,8 +219,9 @@ export function enrichPng(
   }
   const system = SYSTEM_LABELS[association.provider]
   const existingXmp = parsed.value.xmp?.data ?? EMPTY_XMP
+  const observedVersion = association.observedVersion ?? association.model
   const version =
-    association.observedVersion?.trim() === "" ? undefined : association.observedVersion
+    observedVersion?.trim() === "" ? undefined : observedVersion
   const written = writeIptcAiXmp(existingXmp, {
     prompt: association.originalPrompt,
     system,
@@ -227,11 +229,13 @@ export function enrichPng(
   })
   if (written.kind === "rejected") return { kind: "rejected", error: mapXmpFailure(written.error) }
   const sourceUrl = association.sourceUrl?.trim() ?? ""
+  const model = association.model?.trim() ?? ""
   const inserted = insertPngMetadata(input, {
     xmpData: written.value,
     exifData: buildExifProfile({ description: association.originalPrompt, software: system }),
     parametersText: buildParametersText(association.originalPrompt),
     ...(sourceUrl === "" ? {} : { sourceUrl }),
+    ...(model === "" ? {} : { modelText: model }),
   })
   if (inserted.kind === "rejected")
     return { kind: "rejected", error: mapPngFailure(inserted.error) }

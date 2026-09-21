@@ -26,6 +26,7 @@ export type GeminiImageDescriptor = {
 export type GeminiScanResult = {
   readonly prompt: string
   readonly turnId: ProviderTurnId
+  readonly model?: string
   readonly images: readonly GeminiImageDescriptor[]
   readonly association: "provider_identity" | "confirmation_required"
   readonly actions: readonly ProviderAction[]
@@ -72,6 +73,20 @@ function userTurnText(turn: Element): string {
     turn.querySelector(GEMINI_SELECTORS.userTurnText) ??
     turn.querySelector(GEMINI_SELECTORS.userTurnTextFallback)
   return node?.textContent ?? ""
+}
+
+/** Reads the user-visible Gemini model without calling its private APIs. */
+export function readGeminiModel(document_like: Document): string | undefined {
+  const selected = document_like.querySelector(GEMINI_SELECTORS.selectedMode)?.textContent?.trim()
+  if (selected !== undefined && selected !== "") return selected
+
+  const button = document_like.querySelector(GEMINI_SELECTORS.modeButton)
+  const label = button?.getAttribute("aria-label") ?? button?.textContent ?? ""
+  const current = /currently\s+(.+)$/iu.exec(label)?.[1]?.trim() ?? label.trim()
+  if (/flash-lite/iu.test(current)) return "3.5 Flash-Lite"
+  if (/\bpro\b/iu.test(current)) return "3.1 Pro"
+  if (/\bflash\b/iu.test(current)) return "3.6 Flash"
+  return undefined
 }
 
 function isGeneratedImage(image: Element): boolean {
@@ -216,12 +231,14 @@ export function captureGeminiTurn(
   if (classified.images.length === 0) {
     return { kind: "rejected", reason: "no_images" }
   }
+  const model = readGeminiModel(document_like)
   const promptCapture: PromptCapture = {
     id: captureId,
     provider: "gemini",
     originalPrompt: normalized,
     capturedAt: now,
     ...(classified.modelTurnId === undefined ? {} : { providerTurnId: classified.modelTurnId }),
+    ...(model === undefined ? {} : { model }),
   }
   return {
     kind: "ok",
@@ -256,10 +273,12 @@ export function scanGeminiTurns(
       classified.model === undefined
     )
       continue
+    const model = readGeminiModel(document_like)
     results.push({
       prompt,
       turnId: classified.modelTurnId,
       images: classified.images,
+      ...(model === undefined ? {} : { model }),
       association: classified.association,
       actions: geminiActions(classified.model),
     })

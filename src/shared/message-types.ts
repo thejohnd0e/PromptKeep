@@ -66,6 +66,7 @@ export type OffscreenJobMessage = {
   readonly providerSystemLabel: string
   readonly prompt: string
   readonly sourceUrl?: string
+  readonly model?: string
 }
 
 export type OffscreenAckMessage = {

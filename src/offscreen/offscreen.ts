@@ -33,7 +33,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           nonce: job.nonce,
           providerSystemLabel: job.providerSystemLabel,
           prompt: job.prompt,
-          ...(job.sourceUrl === undefined ? {} : { sourceUrl: job.sourceUrl }),
+           ...(job.sourceUrl === undefined ? {} : { sourceUrl: job.sourceUrl }),
+           ...(job.model === undefined ? {} : { model: job.model }),
         },
         { loadAsset: assetTransfer.take },
       ).then((result) => {

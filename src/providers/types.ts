@@ -16,6 +16,7 @@ export type ProviderAction = {
 export type ScanResult = {
   readonly prompt: string
   readonly turnId: string
+  readonly model?: string
   readonly association: "provider_identity" | "confirmation_required"
   readonly images: readonly ProviderImage[]
   readonly actions?: readonly ProviderAction[]

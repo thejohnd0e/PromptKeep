@@ -43,6 +43,7 @@ const promptCaptureSchema = z
     capturedAt: timestampSchema,
     providerTurnId: stringId.transform(providerTurnId).exactOptional(),
     sourceUrl: sourceUrlSchema.exactOptional(),
+    model: z.string().trim().min(1).max(128).exactOptional(),
   })
   .refine(
     (value) =>
@@ -56,6 +57,7 @@ const promptCaptureSchema = z
     capturedAt: value.capturedAt,
     ...(value.providerTurnId === undefined ? {} : { providerTurnId: value.providerTurnId }),
     ...(value.sourceUrl === undefined ? {} : { sourceUrl: value.sourceUrl }),
+    ...(value.model === undefined ? {} : { model: value.model }),
   }))
 
 function isForbiddenUrlHost(hostname: string): boolean {
@@ -193,6 +195,7 @@ const offscreenJobSchema = z.strictObject({
   providerSystemLabel: z.string().min(1),
   prompt: z.string(),
   sourceUrl: sourceUrlSchema.exactOptional(),
+  model: z.string().trim().min(1).max(128).exactOptional(),
 })
 
 const offscreenAckSchema = z.strictObject({

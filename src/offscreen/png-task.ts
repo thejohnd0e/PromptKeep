@@ -11,6 +11,7 @@ export type PngTaskRequest = {
   readonly providerSystemLabel: string
   readonly prompt: string
   readonly sourceUrl?: string
+  readonly model?: string
 }
 
 export type PngTaskResult =
@@ -122,7 +123,8 @@ export async function runPngTask(
     {
       provider,
       originalPrompt: request.prompt,
-      ...(request.sourceUrl === undefined ? {} : { sourceUrl: request.sourceUrl }),
+       ...(request.sourceUrl === undefined ? {} : { sourceUrl: request.sourceUrl }),
+       ...(request.model === undefined ? {} : { model: request.model }),
     },
     { acknowledgeCaBX: true },
   )
