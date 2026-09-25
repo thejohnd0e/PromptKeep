@@ -9,8 +9,7 @@ _Never lose the prompt behind an image_
 
 A local-only Chrome extension that saves AI-generated images **together with the prompt
 that produced them**. It adds a small download control to generated images on ChatGPT,
-Google Gemini, and Grok, then embeds the prompt as standard IPTC AI metadata in the
-downloaded PNG.
+Google Gemini, and Grok Imagine, then embeds the prompt in the downloaded PNG.
 
 No backend, no accounts, no telemetry — the prompt never leaves your machine.
 
@@ -18,23 +17,29 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
 
 ## What it does
 
-1. Detects generated images on supported provider pages and overlays a round white **P**
-   button (visible on hover, top-right corner of the image).
-2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it with
-   a provider-prefixed unique name (e.g. `ChatGPT-<unique-id>-ai-prompt.png` for ChatGPT,
-   `Gemini-<unique-id>-ai-prompt.png` for Gemini, and
-   `Grok_imagine_<unique-id>-ai-prompt.png` for Grok Imagine.
-3. Leaves the pixels untouched and copies every unrelated PNG chunk byte-for-byte,
-   including the original CRCs and any `caBX` (C2PA) payload.
-4. Adds quick actions below the download button for generated images:
-   - **Google Gemini** — `Try again` and `Personalize`, delegated to Gemini's native
-     controls for the matching response.
-    - **ChatGPT** — `Regenerate image`, which opens the matching user message editor and
-      submits the unchanged prompt through ChatGPT's native `Send` control.
+PromptKeep currently supports these services:
 
-The quick actions are scoped to the specific response containing the image. They fail
-closed when the provider's current DOM does not expose an unambiguous native control;
-the extension never calls private provider APIs for these actions.
+| Service | Supported pages | Extra actions |
+| --- | --- | --- |
+| **ChatGPT** | Generated images on ChatGPT | `Regenerate image` |
+| **Google Gemini** | Generated images on Gemini | `Try again`, `Personalize` |
+| **Grok Imagine** | Images on `grok.com/imagine/post/...` | — |
+
+For every supported image:
+
+1. Hover over the image to reveal the round **P** button in its top-right corner.
+2. Click the button to download the full-size PNG with the original prompt embedded inside
+   the file as metadata.
+3. Find the downloaded file in your normal Downloads folder. Its name identifies the
+   service and includes a unique ID, for example `Grok_imagine_<unique-id>-ai-prompt.png`.
+
+PromptKeep does not add a visible watermark and does not change the image pixels. It keeps
+the original PNG data and adds the prompt metadata alongside it.
+
+The optional quick actions use the provider's own visible controls and apply only to the
+specific response containing the image. If a provider changes its page layout or does not
+expose an unambiguous control, the affected action stays disabled; PromptKeep never calls
+private provider APIs.
 
 ## Metadata written
 
@@ -65,7 +70,15 @@ The prompt remains fully available through XMP and `parameters`.
 
 ## Installation
 
-### Chrome extension
+### Install a release
+
+1. Download the latest `PromptKeep-v<version>-chrome.zip` from the
+   [Releases page](https://github.com/thejohnd0e/PromptKeep/releases).
+2. Extract the ZIP archive to a folder.
+3. Open `chrome://extensions` in Google Chrome and enable **Developer mode**.
+4. Choose **Load unpacked** and select the extracted folder.
+
+### Build from source
 
 ```bash
 npm ci
@@ -119,7 +132,7 @@ Everything runs locally in the browser. The extension:
 
 - ships no remote code, uses no analytics, and sends no prompt anywhere;
 - requests only `storage`, `downloads`, and `offscreen`, plus the exact provider hosts;
-- keeps operation state in `chrome.storage.session` and deletes it after completion;
+- keeps temporary operation state locally in Chrome and deletes it after completion;
 - never uploads, logs, or persists the raw prompt beyond the download itself.
 
 ## License
