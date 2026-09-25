@@ -67,6 +67,9 @@ The prompt remains fully available through XMP and `parameters`.
 
 - **ExifTool** / **ExifToolGUI** — shows `PNG:Parameters`, `PNG:Source`, and
   `XMP-iptcExt:AIPromptInformation`.
+- **[PromptLens](https://github.com/thejohnd0e/prompt-lens)** — a convenient local
+  Windows application for viewing the prompt, AI system, model version, source URL,
+  image preview, and metadata status.
 
 ### PromptLens for Windows
 
