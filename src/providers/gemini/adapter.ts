@@ -69,10 +69,11 @@ function isUserTurn(turn: Element): boolean {
 }
 
 function userTurnText(turn: Element): string {
-  const node =
-    turn.querySelector(GEMINI_SELECTORS.userTurnText) ??
-    turn.querySelector(GEMINI_SELECTORS.userTurnTextFallback)
-  return node?.textContent ?? ""
+  const visibleLines = [...turn.querySelectorAll(GEMINI_SELECTORS.userTurnText)]
+  if (visibleLines.length > 0) {
+    return visibleLines.map((line) => line.textContent ?? "").join("\n")
+  }
+  return turn.querySelector(GEMINI_SELECTORS.userTurnTextFallback)?.textContent ?? ""
 }
 
 /** Reads the user-visible Gemini model without calling its private APIs. */

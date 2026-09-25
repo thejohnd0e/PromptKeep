@@ -2,6 +2,13 @@
 
 All notable project changes are documented in this file.
 
+## [1.24] - 2026-09-25
+
+### Fixed
+
+- Fixed Gemini prompt extraction for prompts split across multiple visible lines.
+- Preserved line breaks and the complete prompt in generated image metadata.
+
 ## [1.23] - 2026-09-25
 
 ### Fixed
