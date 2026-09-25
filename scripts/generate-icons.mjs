@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import process from "node:process"
 
 const OUT_DIR = resolve(process.cwd(), "src/chrome/icons")
-const SOURCE = resolve(process.cwd(), "button_new.png")
+const SOURCE = resolve(process.cwd(), "promptkeep-icon-source.png")
 const SIZES = [16, 32, 48, 128]
 
 mkdirSync(OUT_DIR, { recursive: true })
