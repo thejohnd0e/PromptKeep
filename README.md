@@ -27,8 +27,8 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
 4. Adds quick actions below the download button for generated images:
    - **Google Gemini** — `Try again` and `Personalize`, delegated to Gemini's native
      controls for the matching response.
-   - **ChatGPT** — `Edit and resend`, which opens the matching user message editor and
-     submits the unchanged prompt through ChatGPT's native `Send` control.
+    - **ChatGPT** — `Regenerate image`, which opens the matching user message editor and
+      submits the unchanged prompt through ChatGPT's native `Send` control.
 
 The quick actions are scoped to the specific response containing the image. They fail
 closed when the provider's current DOM does not expose an unambiguous native control;
