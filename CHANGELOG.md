@@ -2,6 +2,13 @@
 
 All notable project changes are documented in this file.
 
+## [1.26] - 2026-09-25
+
+### Fixed
+
+- Fixed Gemini rescans selecting the extension's own download button instead of
+  the native full-size download control.
+
 ## [1.25] - 2026-09-25
 
 ### Added

@@ -4,7 +4,7 @@
  * Gemini renders model turns with generated-image containers; every selector
  * is versioned so fixtures and tests pin the exact DOM shape they cover.
  */
-export const GEMINI_SELECTORS_VERSION = 2
+export const GEMINI_SELECTORS_VERSION = 3
 
 export const GEMINI_SELECTORS = {
   /** A single conversation turn container. */

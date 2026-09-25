@@ -109,7 +109,12 @@ function nearbyDownloadControl(image: Element): Element | null {
     image,
   ]
   for (const container of containers) {
-    const control = container?.querySelector(GEMINI_SELECTORS.downloadControl)
+    const control = [...(container?.querySelectorAll(GEMINI_SELECTORS.downloadControl) ?? [])].find(
+      (candidate) =>
+        !(candidate.getAttribute("class") ?? "")
+          .split(/\s+/u)
+          .includes("aip2e-download-button"),
+    )
     if (control !== undefined && control !== null) return control
   }
   return null
