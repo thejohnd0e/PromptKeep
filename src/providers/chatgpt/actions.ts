@@ -22,10 +22,10 @@ function waitFor<T>(find: () => T | undefined, description: string): Promise<T> 
   })
 }
 
-export function chatGptEditAndResend(userTurn: Element): ProviderAction {
+export function chatGptRegenerate(userTurn: Element): ProviderAction {
   return {
-    kind: "edit_and_resend",
-    label: "Edit and resend",
+    kind: "regenerate",
+    label: "Regenerate image",
     run: async () => {
       const edit = userTurn.querySelector(CHATGPT_SELECTORS.editMessage)
       if (!(edit instanceof HTMLElement)) {
@@ -38,10 +38,15 @@ export function chatGptEditAndResend(userTurn: Element): ProviderAction {
         "the message editor",
       )
       const send = await waitFor(() => {
+        const labelled = userTurn.querySelector(CHATGPT_SELECTORS.sendMessage)
+        if (labelled instanceof HTMLElement && !labelled.hasAttribute("disabled")) {
+          return labelled
+        }
         return [...userTurn.querySelectorAll("button")].find(
           (button) =>
-            button.classList.contains("btn-primary") &&
-            !button.hasAttribute("disabled"),
+            !button.hasAttribute("disabled") &&
+            (button.getAttribute("aria-label") === "Send" ||
+              button.textContent?.trim() === "Send"),
         ) as HTMLElement | undefined
       }, "the Send button")
       send.click()

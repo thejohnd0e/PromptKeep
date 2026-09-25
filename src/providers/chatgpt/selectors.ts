@@ -5,7 +5,7 @@
  * versioned so fixtures and tests pin the exact DOM shape they cover. When a
  * selector stops matching, bump the version and refresh the fixtures.
  */
-export const CHATGPT_SELECTORS_VERSION = 2
+export const CHATGPT_SELECTORS_VERSION = 3
 
 export const CHATGPT_SELECTORS = {
   /** The message thread container holding all turns. */
@@ -26,7 +26,13 @@ export const CHATGPT_SELECTORS = {
   /** Composer textarea for provisional prompt capture. */
   composer: "#prompt-textarea",
   editMessage: "button[aria-label='Edit message']",
-  editComposer: "textarea[aria-label='Edit message']",
+  editComposer:
+    "[contenteditable='true'][role='textbox'][aria-label='Edit message'], textarea[aria-label='Edit message']",
+  sendMessage: "button[aria-label='Send']",
+  currentGallery: "[data-testid='generated-image-gallery']",
+  currentAssistantHeading: "h4[data-conversation-role='assistant']",
+  currentUserUnit: "[data-chatgpt-search-unit-key$=':user']",
+  currentUserText: "[data-search-result-target]",
 } as const
 
 export type ChatGptSelectorKey = keyof typeof CHATGPT_SELECTORS

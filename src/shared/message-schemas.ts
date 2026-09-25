@@ -31,8 +31,11 @@ const imageSourceUrlSchema = z
   .string()
   .max(2048)
   .refine(
-    (value) => value.startsWith("https://") || value.startsWith("blob:https://gemini.google.com/"),
-    { message: "image sourceUrl must be https or a Gemini blob URL" },
+    (value) =>
+      value.startsWith("https://") ||
+      value.startsWith("blob:https://gemini.google.com/") ||
+      value.startsWith("blob:https://chatgpt.com/"),
+    { message: "image sourceUrl must be https or a provider blob URL" },
   )
 
 const promptCaptureSchema = z

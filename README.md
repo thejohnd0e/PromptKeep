@@ -1,6 +1,6 @@
 # AI Prompt Image Metadata
 
-[![Version](https://img.shields.io/badge/version-1.21-2E7D32)](https://github.com/thejohnd0e/AIprompt2exif/releases/tag/v1.21)
+[![Version](https://img.shields.io/badge/version-1.23-2E7D32)](https://github.com/thejohnd0e/AIprompt2exif/releases/tag/v1.23)
 [![License](https://img.shields.io/badge/license-MIT-blue?label=license)](./LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Privacy](https://img.shields.io/badge/privacy-local--only-2E7D32)](#privacy)

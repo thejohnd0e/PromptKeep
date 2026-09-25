@@ -13,7 +13,7 @@ import {
   unixMilliseconds,
 } from "../../shared/contracts"
 import { CHATGPT_SELECTORS } from "./selectors"
-import { chatGptEditAndResend } from "./actions"
+import { chatGptRegenerate } from "./actions"
 import type { ProviderAction } from "../types"
 
 export type ChatGptTurn = {
@@ -109,8 +109,65 @@ function imageDescriptor(
   const hasDownloadControl =
     container.querySelector(CHATGPT_SELECTORS.downloadControl) !== null ||
     image.parentElement?.querySelector(CHATGPT_SELECTORS.downloadControl) !== null
-  const proven = src !== "" && (src.includes("/backend-api/estuary/content") || hasDownloadControl)
+  const proven =
+    src !== "" &&
+    (src.startsWith("blob:") || src.includes("/backend-api/estuary/content") || hasDownloadControl)
   return { candidate, turnId, proven, element: image }
+}
+
+function currentAssistantBlock(image: Element): Element | undefined {
+  let current = image.parentElement
+  while (current !== null) {
+    if (current.querySelector(CHATGPT_SELECTORS.currentAssistantHeading) !== null) return current
+    current = current.parentElement
+  }
+  return undefined
+}
+
+function currentPrompt(assistantBlock: Element): string {
+  const userUnit = assistantBlock.parentElement?.querySelector(CHATGPT_SELECTORS.currentUserUnit)
+  const text =
+    userUnit?.querySelector(CHATGPT_SELECTORS.currentUserText)?.textContent ??
+    userUnit?.querySelector(CHATGPT_SELECTORS.userTurnText)?.textContent ??
+    ""
+  return normalizePromptText(text)
+}
+
+function currentTurnId(assistantBlock: Element, index: number): ProviderTurnId {
+  const message = assistantBlock.querySelector("[data-chatgpt-search-message-ids]")
+  return providerTurnId(
+    `chatgpt:${message?.getAttribute("data-chatgpt-search-message-ids") ?? `current-${index}`}`,
+  )
+}
+
+/** Scans ChatGPT's current message layout, which no longer exposes turn roles. */
+function scanCurrentChatGptLayout(
+  document_like: Document,
+  now: UnixMilliseconds,
+): readonly ChatGptScanResult[] {
+  const results: ChatGptScanResult[] = []
+  const seenBlocks = new Set<Element>()
+  for (const gallery of document_like.querySelectorAll(CHATGPT_SELECTORS.currentGallery)) {
+    const assistantBlock = currentAssistantBlock(gallery)
+    if (assistantBlock === undefined || seenBlocks.has(assistantBlock)) continue
+    seenBlocks.add(assistantBlock)
+    const prompt = currentPrompt(assistantBlock)
+    if (prompt === "") continue
+    const turnId = currentTurnId(assistantBlock, results.length)
+    const userUnit = assistantBlock.parentElement?.querySelector(CHATGPT_SELECTORS.currentUserUnit)
+    const images = [...gallery.querySelectorAll("img")]
+      .filter(isGeneratedImage)
+      .map((image, index) => imageDescriptor(image, turnId, now, index))
+    if (images.length === 0) continue
+    results.push({
+      prompt,
+      turnId,
+      images,
+      association: "provider_identity",
+      actions: userUnit === null || userUnit === undefined ? [] : [chatGptRegenerate(userUnit)],
+    })
+  }
+  return results
 }
 
 /**
@@ -240,6 +297,7 @@ export function scanChatGptTurns(
   now: UnixMilliseconds,
 ): readonly ChatGptScanResult[] {
   const turns = [...document_like.querySelectorAll(CHATGPT_SELECTORS.turn)]
+  if (turns.length === 0) return scanCurrentChatGptLayout(document_like, now)
   const results: ChatGptScanResult[] = []
   for (let index = 0; index < turns.length - 1; index += 1) {
     const turn = turns[index]
@@ -253,7 +311,7 @@ export function scanChatGptTurns(
       turnId: classified.assistantTurnId,
       images: classified.images,
       association: classified.association,
-      actions: [chatGptEditAndResend(turn)],
+      actions: [chatGptRegenerate(turn)],
     })
   }
   return results
