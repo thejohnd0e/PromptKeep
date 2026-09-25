@@ -68,6 +68,22 @@ The prompt remains fully available through XMP and `parameters`.
 - **ExifTool** / **ExifToolGUI** — shows `PNG:Parameters`, `PNG:Source`, and
   `XMP-iptcExt:AIPromptInformation`.
 
+### PromptLens for Windows
+
+For a more convenient way to inspect files saved by PromptKeep, use
+[PromptLens](https://github.com/thejohnd0e/prompt-lens). It is a free, local-only
+Windows application that opens one or more PNG files and displays:
+
+- the original prompt;
+- the AI system and model version, when available;
+- the source URL;
+- a preview of the image;
+- the metadata reading status.
+
+PromptLens is read-only: it never modifies the source PNG, uploads files, or saves
+prompts and file history. Download the latest portable Windows version from the
+[PromptLens Releases page](https://github.com/thejohnd0e/prompt-lens/releases/latest).
+
 ## Installation
 
 ### Install a release
