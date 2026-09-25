@@ -2,6 +2,15 @@
 
 All notable project changes are documented in this file.
 
+## [1.23] - 2026-09-25
+
+### Fixed
+
+- Updated ChatGPT image scanning for the current gallery and message DOM.
+- Restored the ChatGPT `Regenerate image` action through native `Edit` and `Send` controls.
+- Fixed ChatGPT blob-image downloads and allowed ChatGPT blob message payloads.
+- Added missing `fast-check` and `vitest` development dependencies.
+
 ## [1.21] - 2026-09-21
 
 ### Added
