@@ -1,6 +1,6 @@
 # AI Prompt Image Metadata
 
-[![Version](https://img.shields.io/badge/version-1.23-2E7D32)](https://github.com/thejohnd0e/AIprompt2exif/releases/tag/v1.23)
+[![Version](https://img.shields.io/badge/version-1.25-2E7D32)](https://github.com/thejohnd0e/AIprompt2exif/releases/tag/v1.25)
 [![License](https://img.shields.io/badge/license-MIT-blue?label=license)](./LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Privacy](https://img.shields.io/badge/privacy-local--only-2E7D32)](#privacy)
@@ -20,8 +20,8 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
    button (visible on hover, top-right corner of the image).
 2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it with
    a provider-prefixed unique name (e.g. `ChatGPT-<unique-id>-ai-prompt.png` for ChatGPT,
-   `Gemini-<unique-id>-ai-prompt.png` for Gemini). Grok downloads use the existing
-   `<unique-id>-ai-prompt.png` format.
+   `Gemini-<unique-id>-ai-prompt.png` for Gemini, and
+   `Grok_imagine_<unique-id>-ai-prompt.png` for Grok Imagine.
 3. Leaves the pixels untouched and copies every unrelated PNG chunk byte-for-byte,
    including the original CRCs and any `caBX` (C2PA) payload.
 4. Adds quick actions below the download button for generated images:
@@ -83,9 +83,8 @@ select the generated `dist/chrome` directory.
 Three isolated layers keep volatile provider integrations away from the byte-level writer:
 
 - **Provider adapters** (`src/providers/`) — versioned DOM selectors for ChatGPT, Gemini,
-  and Grok. Each adapter pairs a rendered user turn with the generated images inside the
-  assistant turn that follows it, and fails closed (asking for explicit confirmation)
-  when identity cannot be proven.
+  and Grok Imagine. Each adapter pairs a rendered prompt with generated images and fails
+  closed when identity cannot be proven.
 - **Extension shell** (`src/chrome/`, `src/offscreen/`) — a Manifest V3 service worker
   validates sender origin and message schemas, fetches the asset through an allow-list,
   and hands the bytes to an offscreen document.

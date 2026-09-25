@@ -2,6 +2,22 @@
 
 All notable project changes are documented in this file.
 
+## [1.25] - 2026-09-25
+
+### Added
+
+- Added dedicated Grok Imagine support for `grok.com/imagine/post/*`.
+- Added authenticated Grok CDN image reads while keeping the existing PNG metadata
+  enrichment pipeline.
+
+### Changed
+
+- Grok Imagine downloads are saved with the `Grok_imagine_` filename prefix.
+- Grok image and prompt associations are restricted to the active Imagine post image;
+  unrelated thumbnails and template images are ignored.
+- Updated stale-image handling when Imagine reuses an image DOM node while switching
+  thumbnails.
+
 ## [1.24] - 2026-09-25
 
 ### Fixed

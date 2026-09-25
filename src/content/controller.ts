@@ -59,8 +59,10 @@ function errorMessage(error: ContentResponse): string {
  */
 export function startController(deps: ControllerDeps): ControllerHandle {
   const controls = new Set<DownloadControlHandle>()
-  const mountedElements = new WeakSet<Element>()
-  const elementByHandle = new Map<DownloadControlHandle, Element>()
+  const mountedElements = new Map<
+    Element,
+    { readonly handle: DownloadControlHandle; image: ProviderImage; prompt: string; turnId: string; model: string | undefined }
+  >()
   let status: StatusHandle | undefined
   let rescanTimer: number | undefined
   let initialScan = true
@@ -157,33 +159,54 @@ export function startController(deps: ControllerDeps): ControllerHandle {
   const mountAll = (): void => {
     for (const entry of deps.scan(deps.document_like, deps.now())) {
       for (const image of entry.images) {
-        if (mountedElements.has(image.element)) continue
-        mountedElements.add(image.element)
         const model = initialScan ? undefined : entry.model
+        const existing = mountedElements.get(image.element)
+        if (existing !== undefined) {
+          existing.image = image
+          existing.prompt = entry.prompt
+          existing.turnId = entry.turnId
+          existing.model = model
+          existing.handle.setPrompt(entry.prompt)
+          continue
+        }
+        const state: {
+          image: ProviderImage
+          prompt: string
+          turnId: string
+          model: string | undefined
+          handle: DownloadControlHandle
+        } = {
+          image,
+          prompt: entry.prompt,
+          turnId: entry.turnId,
+          model,
+          handle: undefined as unknown as DownloadControlHandle,
+        }
         const handle = mountDownloadControl({
           container: image.element.parentElement ?? deps.document_like.body,
           imageElement: image.element as HTMLElement,
           label: "Download with prompt",
           provider: deps.provider,
-          prompt: entry.prompt,
+          prompt: state.prompt,
           associationType: associationType(entry.association),
           ...(entry.actions === undefined ? {} : { actions: entry.actions, onAction: handleAction }),
           onRequest: () => {
-            void handleRequest(entry.prompt, entry.turnId, image, model)
+            void handleRequest(state.prompt, state.turnId, state.image, state.model)
           },
         })
+        state.handle = handle
         controls.add(handle)
-        elementByHandle.set(handle, image.element)
+        mountedElements.set(image.element, state)
       }
     }
   }
 
   const disposeStale = (): void => {
-    for (const [handle, element] of [...elementByHandle.entries()]) {
+    for (const [element, state] of [...mountedElements.entries()]) {
       if (!element.isConnected) {
-        handle.dispose()
-        elementByHandle.delete(handle)
+        state.handle.dispose()
         mountedElements.delete(element)
+        controls.delete(state.handle)
       }
     }
   }
@@ -202,6 +225,8 @@ export function startController(deps: ControllerDeps): ControllerHandle {
   observer.observe(deps.document_like.body ?? deps.document_like.documentElement, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "alt"],
   })
 
   return {
@@ -212,6 +237,7 @@ export function startController(deps: ControllerDeps): ControllerHandle {
       }
       for (const handle of controls) handle.dispose()
       controls.clear()
+      mountedElements.clear()
       status?.dispose()
     },
   }

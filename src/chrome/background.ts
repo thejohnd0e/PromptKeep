@@ -60,7 +60,7 @@ function providerFilenameBase(provider: Provider, nonce: OperationNonce): string
     case "gemini":
       return `Gemini-${nonce}`
     case "grok":
-      return nonce
+      return `Grok_imagine_${nonce}`
     default:
       return assertNever(provider)
   }
