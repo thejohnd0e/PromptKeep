@@ -2,7 +2,7 @@
 
 ## Current State
 
-- Repository: `AIprompt2exif`, branch `master`.
+- Repository: `PromptKeep`, branch `master`.
 - Extension version: `1.23`.
 - Latest code commit: `0fcca4d` (`fix(chatgpt): restore image actions and blob downloads`).
 - Latest documentation commit: `15a5a18` (`docs: record 1.23 release changes`).

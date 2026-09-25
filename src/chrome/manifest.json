@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Prompt Image Metadata",
-  "version": "1.26",
-  "description": "Local-only bootstrap build for prompt-associated image metadata.",
+  "name": "PromptKeep",
+  "version": "1.27",
+  "description": "Never lose the prompt behind an image",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "AI Prompt Image Metadata",
+    "default_title": "PromptKeep",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

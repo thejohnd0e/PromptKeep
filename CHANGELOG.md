@@ -2,6 +2,14 @@
 
 All notable project changes are documented in this file.
 
+## [1.27] - 2026-09-25
+
+### Changed
+
+- Rebranded the extension as PromptKeep.
+- Replaced the extension and in-page download button artwork with the PromptKeep `P` mark.
+- Updated the public repository and release naming.
+
 ## [1.26] - 2026-09-25
 
 ### Fixed

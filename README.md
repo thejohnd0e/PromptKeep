@@ -1,6 +1,8 @@
-# AI Prompt Image Metadata
+# PromptKeep
 
-[![Version](https://img.shields.io/badge/version-1.26-2E7D32)](https://github.com/thejohnd0e/AIprompt2exif/releases/tag/v1.26)
+_Never lose the prompt behind an image_
+
+[![Version](https://img.shields.io/badge/version-1.27-2E7D32)](https://github.com/thejohnd0e/PromptKeep/releases/tag/v1.27)
 [![License](https://img.shields.io/badge/license-MIT-blue?label=license)](./LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Privacy](https://img.shields.io/badge/privacy-local--only-2E7D32)](#privacy)
@@ -16,7 +18,7 @@ No backend, no accounts, no telemetry — the prompt never leaves your machine.
 
 ## What it does
 
-1. Detects generated images on supported provider pages and overlays a round white **A**
+1. Detects generated images on supported provider pages and overlays a round white **P**
    button (visible on hover, top-right corner of the image).
 2. On click it downloads the full-size PNG, embeds the prompt metadata, and saves it with
    a provider-prefixed unique name (e.g. `ChatGPT-<unique-id>-ai-prompt.png` for ChatGPT,
